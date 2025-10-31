@@ -1,6 +1,13 @@
 import { ColorRing } from 'react-loader-spinner'
 
-const Loading = ({ height, width, className, text }) => {
+interface LoadingProps {
+  height: number | string
+  width: number | string
+  className?: string
+  text: boolean
+}
+
+const Loading = ({ height, width, className, text }: LoadingProps): JSX.Element => {
   return (
     <div className={className}>
       <ColorRing

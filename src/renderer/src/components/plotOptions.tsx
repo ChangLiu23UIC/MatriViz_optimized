@@ -1,13 +1,12 @@
 import { PlotState } from '@renderer/types'
 import styles from '../assets/plotOptions.module.css'
 
-const PlotOptions = ({
-  plotState,
-  setPlotState
-}: {
+interface PlotOptionsProps {
   plotState: PlotState
   setPlotState: (plotState: PlotState) => void
-}): JSX.Element => {
+}
+
+const PlotOptions = ({ plotState, setPlotState }: PlotOptionsProps): JSX.Element => {
   return (
     <div className={styles.container}>
       <p className={styles.title}>Plot Options</p>
@@ -18,7 +17,7 @@ const PlotOptions = ({
           <input
             type="color"
             value={plotState.minColor}
-            onChange={(event) => setPlotState({ ...plotState, minColor: event.target.value })}
+            onChange={(event): void => setPlotState({ ...plotState, minColor: event.target.value })}
           />
         </div>
         <div className={styles.subsection}>
@@ -28,7 +27,7 @@ const PlotOptions = ({
             step={0.1}
             value={plotState.minScore}
             disabled={plotState.autoMinScore}
-            onChange={(event) =>
+            onChange={(event): void =>
               setPlotState({ ...plotState, minScore: Number(event.target.value) })
             }
           />
@@ -36,7 +35,9 @@ const PlotOptions = ({
           <input
             type="checkbox"
             checked={plotState.autoMinScore}
-            onChange={(event) => setPlotState({ ...plotState, autoMinScore: event.target.checked })}
+            onChange={(event): void =>
+              setPlotState({ ...plotState, autoMinScore: event.target.checked })
+            }
           />
         </div>
       </div>
@@ -47,7 +48,7 @@ const PlotOptions = ({
           <input
             type="color"
             value={plotState.maxColor}
-            onChange={(event) => setPlotState({ ...plotState, maxColor: event.target.value })}
+            onChange={(event): void => setPlotState({ ...plotState, maxColor: event.target.value })}
           />
         </div>
         <div className={styles.subsection}>
@@ -57,7 +58,7 @@ const PlotOptions = ({
             step={0.1}
             value={plotState.maxScore}
             disabled={plotState.autoMaxScore}
-            onChange={(event) =>
+            onChange={(event): void =>
               setPlotState({ ...plotState, maxScore: Number(event.target.value) })
             }
           />
@@ -65,7 +66,9 @@ const PlotOptions = ({
           <input
             type="checkbox"
             checked={plotState.autoMaxScore}
-            onChange={(event) => setPlotState({ ...plotState, autoMaxScore: event.target.checked })}
+            onChange={(event): void =>
+              setPlotState({ ...plotState, autoMaxScore: event.target.checked })
+            }
           />
         </div>
       </div>
@@ -80,7 +83,7 @@ const PlotOptions = ({
               max={10}
               step={0.1}
               value={plotState.pointSize}
-              onChange={(event) =>
+              onChange={(event): void =>
                 setPlotState({ ...plotState, pointSize: Number(event.target.value) })
               }
             />
@@ -90,7 +93,7 @@ const PlotOptions = ({
             <input
               type="checkbox"
               checked={plotState.toggleLabels}
-              onChange={(event) =>
+              onChange={(event): void =>
                 setPlotState({ ...plotState, toggleLabels: event.target.checked })
               }
             />
@@ -100,7 +103,7 @@ const PlotOptions = ({
             <input
               type="checkbox"
               checked={plotState.toggleGridlines}
-              onChange={(event) =>
+              onChange={(event): void =>
                 setPlotState({ ...plotState, toggleGridlines: event.target.checked })
               }
             />

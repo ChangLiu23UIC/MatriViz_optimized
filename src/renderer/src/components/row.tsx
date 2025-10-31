@@ -1,6 +1,12 @@
 import styles from '../assets/row.module.css'
 
-const Row = ({ score, color, index }) => {
+interface RowProps {
+  score: string | number
+  color: string
+  index: string | number
+}
+
+const Row = ({ score, color, index }: RowProps): JSX.Element => {
   return (
     <div className={styles.selectedPoint}>
       <span>{index}</span>

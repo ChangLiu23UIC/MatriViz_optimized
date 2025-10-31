@@ -1,0 +1,49 @@
+.annotationList {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  max-height: none;
+  overflow-y: auto;
+  box-shadow: none;
+  font-family: Arial, sans-serif;
+  height: 100%;
+  width: 100%;
+}
+
+.annotationList h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #333;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 4px;
+}
+
+.annotationItem {
+  padding: 8px 12px;
+  margin: 0;
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  border: none;
+  border-bottom: 1px solid #f0f0f0;
+  width: 100%;
+}
+
+.annotationItem:hover {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+  transform: none;
+}
+
+.annotationItem.highlighted {
+  background-color: #bbdefb;
+  border-color: #1976d2;
+  font-weight: bold;
+  box-shadow: none;
+}
+
+.annotationItem:active {
+  background-color: #90caf9;
+}

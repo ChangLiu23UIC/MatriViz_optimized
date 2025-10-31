@@ -1,47 +1,47 @@
 .container {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 50%;
-    /* height: 50%; */
-    transform: translate(50%, 50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: #fff;
-    border-radius: 0.5rem;
-    box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.2);
-    z-index: 99;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  /* height: 50%; */
+  transform: translate(50%, 50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #fff;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.2);
+  z-index: 99;
 }
 
 .section {
-    display: flex;
-    flex-direction: column;
-    /* gap: 1rem; */
+  display: flex;
+  flex-direction: column;
+  /* gap: 1rem; */
 }
 
 .subsection {
-    display: flex;
-    flex-direction: row;
-    gap: 0.5rem;
-    justify-content: center;
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+  justify-content: center;
 }
 
 .title {
-    font-size: 1.5rem;
-    font-weight: 500;
-    margin-bottom: 1rem;
-    margin: 10px;
-    margin-right: auto;
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  margin: 10px;
+  margin-right: auto;
 }
 
 .subtitle {
-    font-size: 1rem;
-    font-weight: 500;
-    margin: 0;
-    text-align: center;
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0;
+  text-align: center;
 }
 
 input {
-    margin: auto 0;
+  margin: auto 0;
 }

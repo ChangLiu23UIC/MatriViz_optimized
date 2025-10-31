@@ -1,31 +1,30 @@
 .geneBadge {
-    background-color: #007bff;
-    color: white;
-    border-radius: 4px;
-    padding: 4px 8px;
-    margin-right: 8px;
-    margin-bottom: 8px;
-    font-size: 14px;
-    height: 18px;
-    cursor: pointer;
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-right: 8px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  height: 18px;
+  cursor: pointer;
 }
 
 .geneBadge > button {
-    background-color: transparent;
-    border: none;
-    color: white;
-    padding: 0;
-    margin: auto;
-    padding-left: 10px;
-    font-size: 14px;
-
+  background-color: transparent;
+  border: none;
+  color: white;
+  padding: 0;
+  margin: auto;
+  padding-left: 10px;
+  font-size: 14px;
 }
 
 .geneBadge > button:hover {
-    cursor: pointer;
+  cursor: pointer;
 }
 
 .highlighted {
-    background-color: yellow; 
-    color: black;
+  background-color: yellow;
+  color: black;
 }

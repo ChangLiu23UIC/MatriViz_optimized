@@ -9,14 +9,68 @@
 .label {
   font-size: 0.8rem;
   font-weight: 500;
-  fill: rgba(0, 0, 0, 0.2);
-  transition: fill 0.1s ease-in-out;
-  cursor: default;
+  fill: blue;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
   user-select: none;
+  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
 }
 
 .label:hover {
-  fill: rgba(0, 0, 0, 0.5);
+  fill: #0066cc;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9);
+  filter: drop-shadow(0 0 4px rgba(0, 102, 204, 0.3));
+}
+
+/* Enhanced annotation styling */
+.annotationPoint {
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.3));
+}
+
+.annotationPoint:hover {
+  r: 6 !important;
+  fill: #ff6b6b !important;
+  stroke: #ff0000 !important;
+  stroke-width: 2 !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 4px rgba(255, 107, 107, 0.6));
+}
+
+.annotationPoint.selected {
+  r: 8 !important;
+  fill: #28a745 !important;
+  stroke: #1e7e34 !important;
+  stroke-width: 3 !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 6px rgba(40, 167, 69, 0.8));
+}
+
+.hoveredLabel {
+  fill: #ff6b6b !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9) !important;
+  filter: drop-shadow(0 0 6px rgba(255, 107, 107, 0.4)) !important;
+}
+
+.selectedLabel {
+  fill: #28a745 !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9) !important;
+  filter: drop-shadow(0 0 8px rgba(40, 167, 69, 0.5)) !important;
+}
+
+.labelHovered {
+  fill: #0066cc !important;
+  font-weight: 700 !important;
+  font-size: 0.9rem !important;
+  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9) !important;
+  filter: drop-shadow(0 0 4px rgba(0, 102, 204, 0.3)) !important;
 }
 
 .settings {
@@ -35,4 +89,121 @@
 
 .settings > svg {
   margin: auto;
+}
+
+.selectionLostMessage {
+  font-size: 0.8rem;
+  font-weight: 500;
+  fill: #ff6b6b;
+  background-color: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 4px;
+  user-select: none;
+}
+
+/* Ensure SVG is properly clickable */
+.container svg {
+  cursor: crosshair;
+  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  pointer-events: all;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Selection Method & Mode Toggle */
+.selectionModeToggle {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  user-select: none;
+  z-index: 10;
+}
+
+.selectionMethodGroup {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 8px;
+}
+
+.selectionModeGroup {
+  display: flex;
+  gap: 4px;
+}
+
+.selectionMethodButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.selectionMethodButton:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.selectionMethodButton.active {
+  background: #28a745;
+  color: white;
+  border-color: #1e7e34;
+}
+
+.selectionModeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #ccc;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selectionModeButton:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.selectionModeButton.active {
+  background: #007acc;
+  color: white;
+  border-color: #005a9e;
+}
+
+.clearButton {
+  background: #dc3545 !important;
+  color: white !important;
+  border-color: #c82333 !important;
+}
+
+.clearButton:hover:not(:disabled) {
+  background: #c82333 !important;
+  border-color: #bd2130 !important;
+}
+
+.clearButton:disabled {
+  background: #6c757d !important;
+  border-color: #6c757d !important;
+  cursor: not-allowed;
+  opacity: 0.6;
 }

@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 /* Components */
-import Plot from './components/plot'
+import Plot from './components/plot-hybrid'
 import Badge from './components/badge'
 import Row from './components/row'
 import Loading from './components/loading'
+import PlotOptions from './components/plotOptions'
+
+/* Services */
+import { datasetCache } from './services/dataset-cache'
 
 /* Styles */
 import styles from './assets/app.module.css'
@@ -18,29 +22,42 @@ const App = (): JSX.Element => {
   const defaultMaxColor = '#ff0000'
 
   const [resourcesDir, setResourcesDir] = useState<string>('./')
+  const [resourcesLoading, setResourcesLoading] = useState(false)
+  const [lastResourcesDir, setLastResourcesDir] = useState<string>('./')
   const [resources, setResources] = useState<ResourceFile[]>([])
   const [currentResource, setCurrentResource] = useState<ResourceFile>()
-  const [categories, setCategories] = useState({} as any)
+  const [categories, setCategories] = useState<Record<string, string[]>>({})
   const [allGenes, setAllGenes] = useState([] as string[]) // Columns from parquet file
+  const [geneListLoading, setGeneListLoading] = useState(false)
+  const [geneCache, setGeneCache] = useState<Record<string, string[]>>({}) // Cache for gene lists by parquet file
+  const [dataCache, setDataCache] = useState<Record<string, DataPoint[]>>({}) // Cache for processed data by parquet file + genes
 
   const [data, setData] = useState<DataPoint[]>([])
   const [labels, setLabels] = useState<LabelPoint[]>([])
+  const [plotSelectedPoints, setPlotSelectedPoints] = useState<DataPoint[]>([]) // Lifted state from Plot
 
-  const [loading, setLoading] = useState(true)
-  const [minorLoading, setMinorLoading] = useState(false) // Use only for non-blocking loading
+  // Update selectedData when plotSelectedPoints changes
+  useEffect(() => {
+    setSelectedData(plotSelectedPoints)
+  }, [plotSelectedPoints])
 
-  const [selectedGenes, setSelectedGenes] = useState(["COL1A1"]);
+  const [_loading, setLoading] = useState(true)
+  const [_minorLoading, setMinorLoading] = useState(false) // Use only for non-blocking loading
+  const [_dataLoading, setDataLoading] = useState(false)
+
+  const [selectedGenes, setSelectedGenes] = useState([] as string[])
   const [highlightedGene, setHighlightedGene] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [showAllGenes, setShowAllGenes] = useState(false)
   const [selectedData, setSelectedData] = useState<DataPoint[]>([])
   const [searchInput, setSearchInput] = useState('')
   const [searchResults, setSearchResults] = useState<string[]>([])
+  const [showPlotOptions, setShowPlotOptions] = useState(false)
 
   const [plotState, setPlotState] = useState<PlotState>({
     minScore: 0,
     maxScore: 10,
-    autoMinScore: false,
+    autoMinScore: true,
     autoMaxScore: true,
     minColor: defaultMinColor,
     maxColor: defaultMaxColor,
@@ -51,173 +68,480 @@ const App = (): JSX.Element => {
     toggleGridlines: true
   })
 
-  const handleResourceDirectorySelection = () => {
-    window.resources.setResourceDir().then(result => {
-      setResourcesDir(result);
-    });
+  const handleResourceDirectorySelection = (): void => {
+    window.resources.setResourceDir().then((result) => {
+      setResourcesDir(result)
+    })
   }
 
-  const populateResources = () => {
+  const populateResources = (): void => {
+    if (resourcesLoading) return // Prevent multiple simultaneous calls
+
+    setResourcesLoading(true)
     window.resources.getResourceList(resourcesDir).then((files) => {
-      if(files.length == 0) // No files found.
-      {
-        setLoading(false);
-        console.error("No files found!");
-        populateResources(); // Note, this is recursive
+      if (files.length == 0) {
+        // No files found.
+        setLoading(false)
+        console.error('No files found in directory:', resourcesDir)
+        setResourcesLoading(false)
+        return
       }
       setResources(files as ResourceFile[])
       if (currentResource === undefined && files.length > 0)
         // If no resource is selected, select the first one
         setCurrentResource(files[0])
+      setResourcesLoading(false)
+    }).catch((error) => {
+      console.error('Error loading resources:', error)
+      setResourcesLoading(false)
     })
   }
 
   useEffect(() => {
-    window.resources.getResourceDir()
-    .then(dir => {
+    window.resources.getResourceDir().then((dir) => {
       setResourcesDir(dir)
     })
-  }, []);
+
+    // Canvas rendering only - WebGL disabled
+    console.log('Canvas rendering only - WebGL disabled');
+  }, [])
 
   useEffect(() => {
-    populateResources()
-  }, [resourcesDir])
+    if (resourcesDir !== lastResourcesDir) {
+      setLastResourcesDir(resourcesDir)
+      populateResources()
+    }
+  }, [resourcesDir, lastResourcesDir])
 
   useEffect(() => {
     if (!currentResource) return
+    const categoryPath = resourcesDir + currentResource.category_file
     window.resources
-      .getResourceCategories(resourcesDir + currentResource.category_file)
+      .getResourceCategories(categoryPath)
       .then((categories) => {
         setCategories(categories)
-        console.log(categories)
+      })
+      .catch((error) => {
+        console.error('Error loading categories for', currentResource.category_name + ':', error)
+        console.error('Category file path:', categoryPath)
+        // Set empty categories as fallback
+        setCategories({})
       })
   }, [currentResource])
 
+  // Load centroid labels immediately when tissue changes
   useEffect(() => {
     if (!currentResource) return
-    window.parquet
-      .getParquetColumns(resourcesDir + currentResource.parquet_file)
-      .then((columns) => {
-        setAllGenes(columns)
-        console.log(columns)
-      })
-  }, [currentResource])
 
-  const handleResourceChange = (event) => {
-    setLoading(true);
-    const selectedResource = event.target.value
-    setSelectedData([]);
-    setCurrentResource(resources.find((resource) => resource.category_name === selectedResource))
-    setSelectedCategory("default");
-    setSelectedGenes([]);
-    console.log('currentResource:' + currentResource)
-  }
-
-  const handleCategoryChange = (event) => {
-    setMinorLoading(true);
-    const selectedCategory = event.target.value;
-    setSelectedData([])
-    if (selectedCategory === "default" || selectedCategory === undefined)
-      setSelectedGenes([]);
-    else
-      setSelectedGenes(categories[selectedCategory]);
-    setSelectedCategory(selectedCategory);
-    
-  }
-
-  const handleBadgeClick = (badge) => {
-    setMinorLoading(true)
-
-    if (highlightedGene == '') {
-      setHighlightedGene(badge)
-      setPlotState({ ...plotState, minColor: 'grey', maxColor: 'yellow', autoMinScore: true})
-    } else {
-      setHighlightedGene('')
-      setPlotState({ ...plotState, minColor: defaultMinColor, maxColor: defaultMaxColor, autoMinScore: false })
-    }
-  }
-
-  const handleSearchInputChange = (event) => {
-    const inputValue = event.target.value
-    setSearchInput(inputValue)
-
-    const results = allGenes.filter((gene) => gene.toLowerCase().includes(inputValue.toLowerCase()))
-    setSearchResults(results)
-  }
-
-  const addSelectedGene = (gene) => {
-    setMinorLoading(true)
-    setSelectedGenes([...selectedGenes, gene])
-    setSearchInput('')
-    setSearchResults([])
-  }
-
-  // Fetch and process the data
-  useEffect(() => {
-    const fetchData = async () => {
-      // setLoading(true);
-      if (!currentResource) return
-
+    const loadCentroidData = async (): Promise<void> => {
       try {
-        // Fetch Parquet file data
-        const fetchedData = await window.parquet.queryParquetFile(
-          resourcesDir + currentResource.parquet_file,
-          [...selectedGenes, 'umap_1', 'umap_2', 'index']
-        )
-        console.log('Data fetched:', fetchedData)
-
-        let selection: string[] = []
-
-        if (highlightedGene != '') selection = [highlightedGene]
-        else selection = selectedGenes
-
-        const processedData = fetchedData.map((d) => ({
-          x: parseFloat(d.umap_1),
-          y: parseFloat(d.umap_2),
-          index: d.index,
-          score: selection.reduce((acc, gene) => acc + parseFloat(d[gene]), 0),
-          color: null // Will be set later
-        }))
-
-        // Sort the data by score to show the highest scoring points on top
-        processedData.sort((a, b) => a.score - b.score)
-
-        const temp = processedData.slice(processedData.length - 5000);
-
-        setData(temp)
-        setLoading(false)
-        setMinorLoading(false)
-
-        // Fetch the centroid data
+        console.log('Loading centroid data for tissue:', currentResource.category_name)
         const centroidData = await window.parquet.queryParquetFile(
           resourcesDir + currentResource.centroid_file,
           ['cen_x', 'cen_y', 'Type']
         )
 
         const processedCentroidData = centroidData.map((d) => ({
-          x: parseFloat(d.cen_x),
-          y: parseFloat(d.cen_y),
-          label: d.Type,
-          color: null // Not currently implemented
+          x: parseFloat(d.cen_x as string),
+          y: parseFloat(d.cen_y as string),
+          label: d.Type as string,
+          color: null
         }))
+        console.log('Loaded centroid data immediately:', processedCentroidData.length, 'labels')
+        if (processedCentroidData.length > 0) {
+          console.log('First centroid:', processedCentroidData[0])
+        }
         setLabels(processedCentroidData)
-        console.log('Centroid data fetched:', processedCentroidData)
       } catch (error) {
-        console.error('Error fetching data:', error)
+        console.error('Error loading centroid data:', error)
       }
     }
 
-    fetchData()
-  }, [selectedGenes, currentResource, highlightedGene])
+    loadCentroidData()
+  }, [currentResource, resourcesDir])
 
-  const handleSelectedData = (selectedData) => {
+  useEffect(() => {
+    if (!currentResource) return
+
+    const parquetFilePath = resourcesDir + currentResource.parquet_file
+
+    // Check if gene list is already cached
+    if (geneCache[parquetFilePath]) {
+      setAllGenes(geneCache[parquetFilePath])
+      return
+    }
+
+    // If not cached, fetch and cache it
+    setGeneListLoading(true)
+
+    // Try DuckDB first, fallback to native parquet service
+    const fetchColumns = async (): Promise<void> => {
+      try {
+        const columns = await window.duckdb.getParquetColumns(parquetFilePath)
+        setAllGenes(columns)
+        setGeneCache((prev) => ({ ...prev, [parquetFilePath]: columns }))
+      } catch (duckdbError) {
+        console.error('DuckDB column fetch failed, falling back to native service:', duckdbError)
+        // Fallback to native parquet service
+        const columns = await window.parquet.getParquetColumns(parquetFilePath)
+        setAllGenes(columns)
+        setGeneCache((prev) => ({ ...prev, [parquetFilePath]: columns }))
+      } finally {
+        setGeneListLoading(false)
+      }
+    }
+
+    fetchColumns()
+  }, [currentResource, geneCache, resourcesDir])
+
+  const handleResourceChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
+    setLoading(true)
+    const selectedResource = event.target.value
+    const newResource = resources.find((resource) => resource.category_name === selectedResource)
+    setCurrentResource(newResource)
+    setSelectedCategory('default')
+    setSelectedGenes([])
+  }
+
+  const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
+    setMinorLoading(true)
+    const selectedCategory = event.target.value
+    if (selectedCategory === 'default' || selectedCategory === undefined) setSelectedGenes([])
+    else setSelectedGenes(categories[selectedCategory])
+    setSelectedCategory(selectedCategory)
+  }
+
+  const handleBadgeClick = (badge: string): void => {
+    setMinorLoading(true)
+
+    if (highlightedGene == '') {
+      setHighlightedGene(badge)
+      setPlotState({ ...plotState, minColor: 'grey', maxColor: 'yellow', autoMinScore: true })
+    } else {
+      setHighlightedGene('')
+      setPlotState({
+        ...plotState,
+        minColor: defaultMinColor,
+        maxColor: defaultMaxColor,
+        autoMinScore: false
+      })
+    }
+  }
+
+  const handleSearchInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>): void => {
+    const inputValue = event.target.value
+    setSearchInput(inputValue)
+
+    if (inputValue.length === 0) {
+      setSearchResults([])
+      return
+    }
+
+    const lowerInput = inputValue.toLowerCase()
+    const results: string[] = []
+
+    // Optimized search - avoid creating new arrays unnecessarily
+    for (const gene of allGenes) {
+      if (gene.toLowerCase().includes(lowerInput)) {
+        results.push(gene)
+      }
+    }
+    setSearchResults(results)
+  }, [allGenes])
+
+  const addSelectedGene = (gene: string): void => {
+    setMinorLoading(true)
+    setSelectedGenes([...selectedGenes, gene])
+    setSearchInput('')
+    setSearchResults([])
+  }
+
+  // Phase 1: Load UMAP coordinates when tissue changes (fast)
+  useEffect(() => {
+    const loadUMAPCoordinates = async (): Promise<void> => {
+      if (!currentResource) {
+        console.log('No current resource selected');
+        return
+      }
+
+      console.log('Loading UMAP coordinates for resource:', currentResource.category_name);
+
+      // Create cache key for UMAP coordinates only
+      const umapCacheKey = datasetCache.generateCacheKey(
+        currentResource.parquet_file,
+        [], // No genes - just UMAP coordinates
+        ''  // No highlighted gene
+      )
+
+      // Check if UMAP coordinates are already cached in IndexedDB
+      try {
+        const cachedData = await datasetCache.get(umapCacheKey);
+        if (cachedData) {
+          console.log('Using cached UMAP coordinates for key:', umapCacheKey);
+          setData(cachedData)
+          setDataLoading(false)
+          setLoading(false)
+          setMinorLoading(false)
+          return
+        }
+      } catch (cacheError) {
+        console.log('IndexedDB cache check failed, falling back to memory cache:', cacheError);
+      }
+
+      // Check if UMAP coordinates are cached in memory
+      const memoryCacheKey = `${currentResource.parquet_file}_umap_only`
+      if (dataCache[memoryCacheKey]) {
+        console.log('Using memory cached UMAP coordinates for key:', memoryCacheKey);
+        setData(dataCache[memoryCacheKey])
+        setDataLoading(false)
+        setLoading(false)
+        setMinorLoading(false)
+        return
+      }
+
+      console.log('No cached UMAP coordinates found, fetching from DuckDB');
+      setDataLoading(true)
+      try {
+        // Always fetch only UMAP coordinates initially
+        const result = await window.duckdb.queryParquetFile(
+          resourcesDir + currentResource.parquet_file,
+          ['umap_1', 'umap_2', 'index']
+        )
+
+        console.log('UMAP data fetched via DuckDB, rows:', result.data.length);
+
+        const processedData = result.data.map((row: any[]) => ({
+          x: parseFloat(row[0] as string),
+          y: parseFloat(row[1] as string),
+          index: row[2] as string,
+          score: 0,
+          color: null,
+          hasExpressionData: false  // Flag to indicate no gene expression data
+        }))
+
+        console.log('Processed UMAP points:', processedData.length);
+        setData(processedData)
+
+        // Cache UMAP coordinates in memory
+        setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
+
+        // Cache UMAP coordinates in IndexedDB
+        try {
+          const query = 'SELECT umap_1, umap_2, index FROM parquet_file';
+          await datasetCache.set(umapCacheKey, processedData, query);
+          console.log('UMAP coordinates cached in IndexedDB with key:', umapCacheKey);
+        } catch (cacheError) {
+          console.error('Failed to cache UMAP coordinates in IndexedDB:', cacheError);
+        }
+      } catch (duckdbError) {
+        console.error('DuckDB query failed, falling back to native parquet service:', duckdbError);
+        // Fallback to native parquet service
+        const fetchedData = await window.parquet.queryParquetFile(
+          resourcesDir + currentResource.parquet_file,
+          ['umap_1', 'umap_2', 'index']
+        )
+
+        const processedData = fetchedData.map((row: any) => ({
+          x: parseFloat(row.umap_1 as string),
+          y: parseFloat(row.umap_2 as string),
+          index: row.index as string,
+          score: 0,
+          color: null,
+          hasExpressionData: false
+        }))
+
+        setData(processedData)
+        setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
+      } finally {
+        setDataLoading(false)
+        setLoading(false)
+        setMinorLoading(false)
+      }
+    }
+
+    loadUMAPCoordinates()
+  }, [currentResource, resourcesDir])
+
+  // Phase 2: Compute gene expression when genes are selected (on-demand)
+  useEffect(() => {
+    const computeGeneExpression = async (): Promise<void> => {
+      // Only compute gene expression if genes are actually selected
+      if (!currentResource || (selectedGenes.length === 0 && highlightedGene === '')) {
+        return
+      }
+
+      console.log('Computing gene expression for resource:', currentResource.category_name);
+      console.log('Selected genes:', selectedGenes);
+      console.log('Highlighted gene:', highlightedGene);
+
+      // Create cache key for this specific gene combination
+      const cacheKey = datasetCache.generateCacheKey(
+        currentResource.parquet_file,
+        selectedGenes,
+        highlightedGene
+      )
+
+      // Check if gene expression data is already cached in IndexedDB
+      try {
+        const cachedData = await datasetCache.get(cacheKey);
+        if (cachedData) {
+          console.log('Using cached gene expression data for key:', cacheKey);
+          setData(cachedData)
+          setMinorLoading(false)
+          return
+        }
+      } catch (cacheError) {
+        console.log('IndexedDB cache check failed, falling back to memory cache:', cacheError);
+      }
+
+      // Check if gene expression data is cached in memory
+      const memoryCacheKey = `${currentResource.parquet_file}_${[...selectedGenes].sort().join('_')}_${highlightedGene}`
+      if (dataCache[memoryCacheKey]) {
+        console.log('Using memory cached gene expression data for key:', memoryCacheKey);
+        setData(dataCache[memoryCacheKey])
+        setMinorLoading(false)
+        return
+      }
+
+      console.log('No cached gene expression data found, computing with DuckDB');
+      setMinorLoading(true)
+      try {
+        let selection: string[] = []
+
+        if (highlightedGene != '') selection = [highlightedGene]
+        else selection = selectedGenes
+
+        // Use DuckDB for gene expression calculations
+        console.log('Using DuckDB for gene expression calculations');
+        try {
+          const result = await window.duckdb.queryParquetFileWithExpression(
+            resourcesDir + currentResource.parquet_file,
+            ['umap_1', 'umap_2', 'index'],
+            selection
+          )
+
+          const processedData = result.data.map((row: any[]) => ({
+            x: parseFloat(row[0] as string),
+            y: parseFloat(row[1] as string),
+            index: row[2] as string,
+            score: parseFloat(row[3] as string),
+            color: null,
+            hasExpressionData: true  // Flag to indicate gene expression data is present
+          }))
+
+          // Sort by score for better visualization
+          processedData.sort((a, b) => a.score - b.score)
+
+          // Debug: log score range
+          const scores = processedData.map(p => p.score)
+          const minScore = Math.min(...scores)
+          const maxScore = Math.max(...scores)
+          console.log('Gene expression score range:', minScore, 'to', maxScore)
+
+          setData(processedData)
+
+          // Cache gene expression data in memory
+          setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
+
+          // Cache gene expression data in IndexedDB
+          try {
+            const query = `SELECT umap_1, umap_2, index, AVG(${selection.join(' + ')}) as avg_expression FROM parquet_file GROUP BY umap_1, umap_2, index`;
+            await datasetCache.set(cacheKey, processedData, query);
+            console.log('Gene expression data cached in IndexedDB with key:', cacheKey);
+          } catch (cacheError) {
+            console.error('Failed to cache gene expression data in IndexedDB:', cacheError);
+          }
+        } catch (duckdbError) {
+          console.error('DuckDB query failed, falling back to native parquet service:', duckdbError);
+          // Fallback to native parquet service
+          const fetchedData = await window.parquet.queryParquetFile(
+            resourcesDir + currentResource.parquet_file,
+            [...selection, 'umap_1', 'umap_2', 'index']
+          )
+
+          const processedData = new Array(fetchedData.length)
+          for (let i = 0; i < fetchedData.length; i++) {
+            const d = fetchedData[i]
+            let score = 0
+            for (const gene of selection) {
+              score += parseFloat(d[gene] as string)
+            }
+            processedData[i] = {
+              x: parseFloat(d.umap_1 as string),
+              y: parseFloat(d.umap_2 as string),
+              index: d.index as string,
+              score: score,
+              color: null,
+              hasExpressionData: true
+            }
+          }
+
+          processedData.sort((a, b) => a.score - b.score)
+          setData(processedData)
+          setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
+        }
+      } catch (error) {
+        console.error('Error computing gene expression:', error)
+      } finally {
+        setMinorLoading(false)
+      }
+    }
+
+    computeGeneExpression()
+  }, [selectedGenes, highlightedGene, currentResource, resourcesDir])
+
+  const handleSelectedData = (selectedData: DataPoint[]): void => {
     setSelectedData(selectedData)
   }
 
-  const removeGene = (geneToRemove) => {
+  const clearSelectedData = (): void => {
+    // Only clear plotSelectedPoints - let the effect in plot.tsx handle updating selectedData
+    setPlotSelectedPoints([])
+  }
+
+  // Recalculate selected points when data or selectedGenes change
+  useEffect(() => {
+    if (selectedData.length === 0 || data.length === 0) return
+
+    // Create a map of current data for fast lookup
+    const currentDataMap = new Map(data.map(point => [point.index, point]))
+
+    // Update selected points with new scores from current data
+    const updatedSelectedData = selectedData.map(selectedPoint => {
+      const currentPoint = currentDataMap.get(selectedPoint.index)
+      if (currentPoint) {
+        // Return the selected point with updated score from current data
+        return {
+          ...selectedPoint,
+          score: currentPoint.score,
+          color: currentPoint.color
+        }
+      }
+      // If point no longer exists in current data, keep it as is
+      return selectedPoint
+    })
+
+    setSelectedData(updatedSelectedData)
+  }, [data, selectedGenes])
+
+  const removeGene = (geneToRemove: string): void => {
     setMinorLoading(true)
     setSelectedGenes(selectedGenes.filter((gene) => gene !== geneToRemove))
   }
+
+  const clearDataCache = async (): Promise<void> => {
+    // Clear memory cache
+    setDataCache({})
+
+    // Clear IndexedDB cache
+    try {
+      await datasetCache.clear();
+      console.log('IndexedDB cache cleared');
+    } catch (error) {
+      console.error('Failed to clear IndexedDB cache:', error);
+    }
+  }
+
 
   return (
     <>
@@ -228,8 +552,13 @@ const App = (): JSX.Element => {
           <div className={styles.categoryContainer}>
             {resources.length === 0 ? (
               <div>
-                <p>No resources found in directory {resourcesDir} <br></br>Please select a resource directory:</p>
-                <button onClick={() => handleResourceDirectorySelection()}>Select Resource Directory</button>
+                <p>
+                  No resources found in directory {resourcesDir} <br></br>Please select a resource
+                  directory:
+                </p>
+                <button onClick={(): void => handleResourceDirectorySelection()}>
+                  Select Resource Directory
+                </button>
               </div>
             ) : (
               <>
@@ -250,7 +579,7 @@ const App = (): JSX.Element => {
                 </select>
               </>
             )}
-        </div>
+          </div>
 
           <h2>Selected Genes</h2>
           <div className={styles.geneSearch}>
@@ -259,13 +588,20 @@ const App = (): JSX.Element => {
               placeholder="Search for a gene..."
               value={searchInput}
               onChange={handleSearchInputChange}
+              disabled={geneListLoading}
             />
+            {geneListLoading && (
+              <div className={styles.loadingIndicator}>
+                <Loading height={16} width={16} text={false} />
+                <span>Loading gene list...</span>
+              </div>
+            )}
             <div className={styles.searchResults}>
               {searchResults.map((gene) => (
                 <div
                   key={gene}
                   className={styles.searchResultItem}
-                  onClick={() => addSelectedGene(gene)}
+                  onClick={(): void => addSelectedGene(gene)}
                 >
                   {gene}
                 </div>
@@ -276,6 +612,7 @@ const App = (): JSX.Element => {
             {/* If showAllGenes is selected, map all. Otherwise, only map 10 */}
             {selectedGenes.slice(0, showAllGenes ? selectedGenes.length : 10).map((gene) => (
               <Badge
+                key={gene}
                 gene={gene}
                 handleBadgeClick={handleBadgeClick}
                 removeGene={removeGene}
@@ -285,29 +622,65 @@ const App = (): JSX.Element => {
             {!showAllGenes && <span className={styles.ellipsis}>...</span>}
           </div>
           {selectedGenes.length > 10 && (
-            <button onClick={() => setShowAllGenes(!showAllGenes)}>
+            <button onClick={(): void => setShowAllGenes(!showAllGenes)}>
               {showAllGenes ? 'Hide' : 'See All'}
             </button>
           )}
 
-          <div className={styles.selectedHeader}>
-            <h2>Selected Points</h2>
-            <button onClick={() => window.export.exportCSV(selectedData,
-                                                           selectedGenes,
-                                                           resourcesDir + currentResource?.parquet_file)
-                                                           }>Export...</button>
+          <div className={styles.cacheManagement}>
+            <button onClick={clearDataCache}>
+              Clear Cache ({Object.keys(dataCache).length} datasets cached)
+            </button>
           </div>
-          
+
+          <div className={styles.selectedHeader}>
+            <h2>Plot Options</h2>
+            <div className={styles.selectedActions}>
+              <button onClick={(): void => setShowPlotOptions(!showPlotOptions)}>
+                {showPlotOptions ? 'Hide' : 'Show'}
+              </button>
+            </div>
+          </div>
+          {showPlotOptions && <PlotOptions plotState={plotState} setPlotState={setPlotState} />}
+
+          <div className={styles.selectedHeader}>
+            <h2>Selected Points ({selectedData.length})</h2>
+            <div className={styles.selectedActions}>
+              <button onClick={clearSelectedData} disabled={selectedData.length === 0}>
+                Clear
+              </button>
+              <button
+                onClick={(): void => {
+                  window.export.exportCSV(
+                    selectedData as unknown as Record<string, unknown>[],
+                    selectedGenes,
+                    resourcesDir + currentResource?.parquet_file
+                  )
+                }}
+                disabled={selectedData.length === 0}
+              >
+                Export...
+              </button>
+            </div>
+          </div>
+
           {selectedData.length > 0 ? (
             <>
-              <Row index={<b>Index</b>} score={<b>Score</b>} color={'white'}></Row> {/* Header */}
+              <div className={styles.selectedHeaderRow}>
+                <span>
+                  <b>Index</b>
+                </span>
+                <span>
+                  <b>Score</b>
+                </span>
+              </div>
               <div className={styles.selectedContainer}>
                 {selectedData.map((point, i) => (
                   <Row
                     key={`selected-point-${i}`}
                     index={point.index}
                     score={point.score.toFixed(3)}
-                    color={point.color}
+                    color={point.color || 'white'}
                   />
                 ))}
               </div>
@@ -317,20 +690,30 @@ const App = (): JSX.Element => {
           )}
         </div>
         <div className={styles.plotArea}>
+
+          {/* Temporarily disabled loading overlays for testing */}
+          {/* {dataLoading && (
+            <div className={styles.dataLoadingOverlay}>
+              <Loading height={60} width={60} text={true} />
+              <p>Loading data...</p>
+            </div>
+          )}
           {minorLoading && (
             <Loading className={styles.minorLoading} height={40} width={40} text={false} />
           )}
           {loading ? (
             <Loading className={styles.loading} height={80} width={80} text={true} />
-          ) : (
+          ) : ( */}
             <Plot
               data={data}
               labels={labels}
               plotState={plotState}
               onSelectedData={handleSelectedData}
-              setPlotState={(state) => setPlotState(state)}
+              selectedPoints={plotSelectedPoints}
+              setSelectedPoints={setPlotSelectedPoints}
+              setPlotState={setPlotState}
             />
-          )}
+          {/* )} */}
         </div>
       </div>
     </>

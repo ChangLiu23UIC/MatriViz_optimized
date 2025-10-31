@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { resolve } from 'path'
 
 // Custom APIs for renderer
 const api = {}
@@ -16,7 +15,7 @@ if (process.contextIsolated) {
       loadFeatherFile: (filePath: string) => {
         return new Promise((resolve, reject) => {
           ipcRenderer.send('load-feather-file', filePath)
-          ipcRenderer.once('load-feather-file-reply', (event, response) => {
+          ipcRenderer.once('load-feather-file-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -28,7 +27,7 @@ if (process.contextIsolated) {
       queryGlobalTable: (query?: { select?: string[] }) => {
         return new Promise((resolve, reject) => {
           ipcRenderer.send('query-global-table', query)
-          ipcRenderer.once('query-global-table-reply', (event, response) => {
+          ipcRenderer.once('query-global-table-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -42,7 +41,7 @@ if (process.contextIsolated) {
       queryParquetFile: (filePath: string, query: string[] = []) => {
         return new Promise((resolve, reject) => {
           ipcRenderer.send('query-parquet-file', filePath, query)
-          ipcRenderer.once('query-parquet-file-reply', (event, response) => {
+          ipcRenderer.once('query-parquet-file-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -54,7 +53,7 @@ if (process.contextIsolated) {
       getParquetColumns: (filePath: string) => {
         return new Promise((resolve, reject) => {
           ipcRenderer.send('get-parquet-columns', filePath)
-          ipcRenderer.once('get-parquet-columns-reply', (event, response) => {
+          ipcRenderer.once('get-parquet-columns-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -68,7 +67,7 @@ if (process.contextIsolated) {
       getResourceList: (dirPath: string) => {
         return new Promise((resolve, reject) => {
           ipcRenderer.send('get-resource-list', dirPath)
-          ipcRenderer.once('get-resource-list-reply', (event, response) => {
+          ipcRenderer.once('get-resource-list-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -80,7 +79,7 @@ if (process.contextIsolated) {
       getResourceCategories: (path: string) => {
         return new Promise((resolve, reject) => {
           ipcRenderer.send('get-resource-categories', path)
-          ipcRenderer.once('get-resource-categories-reply', (event, response) => {
+          ipcRenderer.once('get-resource-categories-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -91,8 +90,8 @@ if (process.contextIsolated) {
       },
       getResourceDir: () => {
         return new Promise((resolve, reject) => {
-          ipcRenderer.send("get-resource-dir")
-          ipcRenderer.once("get-resource-dir-reply", (event, response) => {
+          ipcRenderer.send('get-resource-dir')
+          ipcRenderer.once('get-resource-dir-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -101,10 +100,10 @@ if (process.contextIsolated) {
           })
         })
       },
-      setResourceDir: (path: string) => {
+      setResourceDir: () => {
         return new Promise((resolve, reject) => {
-          ipcRenderer.send("set-resource-dir")
-          ipcRenderer.once("set-resource-dir-reply", (event, response) => {
+          ipcRenderer.send('set-resource-dir')
+          ipcRenderer.once('set-resource-dir-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
             } else {
@@ -115,15 +114,60 @@ if (process.contextIsolated) {
       }
     })
     contextBridge.exposeInMainWorld('export', {
-      exportCSV: (result: {}, selectedGenes: string[], parquetFile: string) => {
+      exportCSV: (
+        result: Record<string, unknown>,
+        selectedGenes: string[],
+        parquetFile: string
+      ) => {
         return new Promise((resolve, reject) => {
-          ipcRenderer.send("export-csv", result, selectedGenes, parquetFile);
-          ipcRenderer.once("export-csv-reply", (event, response) => {
+          ipcRenderer.send('export-csv', result, selectedGenes, parquetFile)
+          ipcRenderer.once('export-csv-reply', (_, response) => {
             if (response instanceof Error) {
               reject(response)
+            } else {
+              resolve(response)
             }
-            else {
-              resolve(response);
+          })
+        })
+      }
+    })
+    contextBridge.exposeInMainWorld('duckdb', {
+      queryParquetFile: (filePath: string, columns: string[]) => {
+        return new Promise((resolve, reject) => {
+          ipcRenderer.send('duckdb-query-parquet', filePath, columns)
+          ipcRenderer.once('duckdb-query-parquet-reply', (_, response) => {
+            if (response instanceof Error) {
+              reject(response)
+            } else {
+              resolve(response)
+            }
+          })
+        })
+      },
+      queryParquetFileWithExpression: (
+        filePath: string,
+        geneColumns: string[],
+        expressionColumns: string[]
+      ) => {
+        return new Promise((resolve, reject) => {
+          ipcRenderer.send('duckdb-query-parquet-with-expression', filePath, geneColumns, expressionColumns)
+          ipcRenderer.once('duckdb-query-parquet-with-expression-reply', (_, response) => {
+            if (response instanceof Error) {
+              reject(response)
+            } else {
+              resolve(response)
+            }
+          })
+        })
+      },
+      getParquetColumns: (filePath: string) => {
+        return new Promise((resolve, reject) => {
+          ipcRenderer.send('duckdb-get-parquet-columns', filePath)
+          ipcRenderer.once('duckdb-get-parquet-columns-reply', (_, response) => {
+            if (response instanceof Error) {
+              reject(response)
+            } else {
+              resolve(response)
             }
           })
         })

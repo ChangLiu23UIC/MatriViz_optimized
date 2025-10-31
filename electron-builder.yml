@@ -13,7 +13,7 @@ asarUnpack:
   - resources/**
 win:
   executableName: MatriViz
-  target: 
+  target:
     - portable
   artifactName: MatriViz_portable.exe
 nsis:

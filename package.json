@@ -20,18 +20,32 @@
     "build:linux": "electron-vite build && electron-builder --linux --config"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.2.2",
+    "@deck.gl/layers": "^9.2.2",
+    "@deck.gl/react": "^9.2.2",
+    "@duckdb/duckdb-wasm": "^1.30.0",
     "@electron-toolkit/preload": "^2.0.0",
     "@electron-toolkit/utils": "^2.0.0",
+    "@luma.gl/core": "^9.2.3",
+    "@luma.gl/engine": "^9.2.3",
+    "@luma.gl/webgl": "^9.2.3",
     "@visx/tooltip": "^3.3.0",
     "@visx/visx": "^3.4.1",
     "apache-arrow": "^14.0.0",
     "d3-polygon": "^3.0.1",
+    "deck.gl": "^9.2.2",
+    "duckdb": "^1.4.1",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.1.1",
+    "flatbush": "^4.5.0",
     "lucide-react": "^0.314.0",
+    "maplibre-gl": "^5.10.0",
     "parquetjs": "^0.11.2",
     "parquetjs-lite": "^0.8.7",
-    "react-loader-spinner": "^6.1.6"
+    "react-loader-spinner": "^6.1.6",
+    "react-map-gl": "^8.1.0",
+    "regl": "^2.1.1",
+    "regl-scatterplot": "^1.14.1"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^1.0.1",

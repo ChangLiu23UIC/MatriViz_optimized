@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'fs/promises'
 import { ResourceFile } from '../types/types'
 
-export const getResourceList = async (dirPath: string) => {
+export const getResourceList = async (dirPath: string): Promise<ResourceFile[]> => {
   const files = await readdir(dirPath)
   const res: Array<ResourceFile> = []
   for (const file of files) {
@@ -21,8 +21,15 @@ export const getResourceList = async (dirPath: string) => {
   return res
 }
 
-export const getCategories = async (path: string) => {
-  const file = await readFile(path, 'utf8')
-  const json = JSON.parse(file)
-  return json
+export const getCategories = async (path: string): Promise<Record<string, string[]>> => {
+  console.log('Reading category file from:', path)
+  try {
+    const file = await readFile(path, 'utf8')
+    const json = JSON.parse(file)
+    console.log('Successfully loaded categories from:', path)
+    return json
+  } catch (error) {
+    console.error('Error reading category file:', path, error)
+    throw error
+  }
 }

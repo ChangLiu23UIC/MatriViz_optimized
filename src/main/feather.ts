@@ -29,17 +29,19 @@ export const queryGlobalTable = (query?: { select?: string[] }): Table | null =>
   return globalTable
 }
 
-export const tableToJson = (table: Table): any[] => {
-  const json = []
+export const tableToJson = (table: Table): Record<string, unknown>[] => {
+  const json: Record<string, unknown>[] = []
   for (let i = 0; i < table.numRows; i++) {
     const row = table.get(i)
-    json.push(rowToObject(row))
+    if (row) {
+      json.push(rowToObject(row))
+    }
   }
   return json
 }
 
-const rowToObject = (row: any): any => {
-  const obj: any = {}
+const rowToObject = (row: Record<string, unknown>): Record<string, unknown> => {
+  const obj: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(row)) {
     obj[key] = value
   }

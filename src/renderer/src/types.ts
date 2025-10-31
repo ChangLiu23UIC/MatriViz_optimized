@@ -6,6 +6,9 @@ export interface DataPoint {
   index: string
   score: number
   color: string | null
+  cx?: number // Pre-computed x coordinate for lasso
+  cy?: number // Pre-computed y coordinate for lasso
+  hasExpressionData?: boolean // Flag to indicate if point has gene expression data
 }
 
 export interface LabelPoint {
@@ -21,11 +24,14 @@ export interface TooltipData {
   data: DataPoint | null
 }
 
+export type SelectionMode = 'lasso' | 'rectangle' | 'circle'
+
 export interface UseLassoProps {
   data: DataPoint[]
   xScale: ScaleLinear<number, number>
   yScale: ScaleLinear<number, number>
   onSelection: (selectedPoints: DataPoint[]) => void
+  selectionMode?: SelectionMode
 }
 
 export interface UseLassoReturn {

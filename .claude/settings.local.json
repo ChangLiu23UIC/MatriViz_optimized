@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run format)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run dev)",
+      "Read(//e/UIC_PHD/Matriviz_project/**)",
+      "Bash(cp -r MatriViz MatriViz-Optimized)",
+      "Bash(npm install deck.gl @deck.gl/core @deck.gl/layers @deck.gl/react @luma.gl/core @luma.gl/engine @luma.gl/webgl)",
+      "Bash(npm install:*)",
+      "Bash(npm run typecheck:web)",
+      "Bash(rm:*)",
+      "Bash(npm run build)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

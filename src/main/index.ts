@@ -1,16 +1,17 @@
-import { app, shell, BrowserWindow, ipcMain, dialog} from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import Store from 'electron-store';
+import Store from 'electron-store'
 
 import { loadFeatherFile, queryGlobalTable, tableToJson } from './feather'
 import { queryParquetFile, getAllColumns } from './parquet'
 import { getResourceList, getCategories } from './resources'
-import { writeToCSV } from './export' 
+import { writeToCSV } from './export'
+import duckDBMainService from './duckdb'
 
 import icon from '../../resources/icon.png?asset'
 
-const store = new Store();
+const store = new Store()
 
 function createWindow(): void {
   // Create the browser window.
@@ -22,12 +23,34 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
   })
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+  })
+
+  // Set CSP header to allow DuckDB-WASM to work
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const csp = [
+      "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;",
+      "worker-src blob: 'self' 'unsafe-inline' 'unsafe-eval';",
+      "child-src blob: 'self' 'unsafe-inline' 'unsafe-eval';",
+      "connect-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;"
+    ].join(' ')
+
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [csp]
+      }
+    })
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -44,12 +67,34 @@ function createWindow(): void {
   }
 }
 
+// Enable hardware acceleration for WebGL
+// app.disableHardwareAcceleration();
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+
+  // Initialize DuckDB in main process
+  console.log('Attempting to initialize DuckDB...')
+  try {
+    await duckDBMainService.initialize()
+    console.log('DuckDB initialized successfully in main process')
+  } catch (error) {
+    console.error('Failed to initialize DuckDB in main process:', error)
+  }
+
+  // WebGL configuration
+  app.commandLine.appendSwitch('--ignore-gpu-blacklist');
+  app.commandLine.appendSwitch('--enable-gpu-rasterization');
+  app.commandLine.appendSwitch('--enable-accelerated-2d-canvas');
+  app.commandLine.appendSwitch('--enable-webgl');
+  app.commandLine.appendSwitch('--enable-webgl2');
+
+  // CSP configuration for DuckDB-WASM
+  app.commandLine.appendSwitch('--disable-web-security');
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -91,9 +136,12 @@ ipcMain.on('load-feather-file', async (event, filePath: string) => {
 ipcMain.on('query-global-table', (event, query?: { select?: string[] }) => {
   try {
     const table = queryGlobalTable(query)
-    const json = tableToJson(table)
-
-    event.reply('query-global-table-reply', json)
+    if (table) {
+      const json = tableToJson(table)
+      event.reply('query-global-table-reply', json)
+    } else {
+      event.reply('query-global-table-reply', [])
+    }
   } catch (error) {
     event.reply('query-global-table-reply', error)
   }
@@ -117,6 +165,43 @@ ipcMain.on('get-parquet-columns', async (event, filePath: string) => {
   }
 })
 
+// DuckDB IPC handlers
+ipcMain.on('duckdb-query-parquet', async (event, filePath: string, columns: string[]) => {
+  try {
+    const result = await duckDBMainService.queryParquetFile(filePath, columns)
+    event.reply('duckdb-query-parquet-reply', result)
+  } catch (error) {
+    event.reply('duckdb-query-parquet-reply', error)
+  }
+})
+
+ipcMain.on('duckdb-query-parquet-with-expression', async (
+  event,
+  filePath: string,
+  geneColumns: string[],
+  expressionColumns: string[]
+) => {
+  try {
+    const result = await duckDBMainService.queryParquetFileWithExpression(
+      filePath,
+      geneColumns,
+      expressionColumns
+    )
+    event.reply('duckdb-query-parquet-with-expression-reply', result)
+  } catch (error) {
+    event.reply('duckdb-query-parquet-with-expression-reply', error)
+  }
+})
+
+ipcMain.on('duckdb-get-parquet-columns', async (event, filePath: string) => {
+  try {
+    const columns = await duckDBMainService.getParquetColumns(filePath)
+    event.reply('duckdb-get-parquet-columns-reply', columns)
+  } catch (error) {
+    event.reply('duckdb-get-parquet-columns-reply', error)
+  }
+})
+
 ipcMain.on('get-resource-list', async (event, dirPath: string) => {
   try {
     const files = await getResourceList(dirPath)
@@ -135,47 +220,44 @@ ipcMain.on('get-resource-categories', async (event, path: string) => {
   }
 })
 
-ipcMain.on('export-csv', async (event, result:[], selectedGenes: string[], parquetFile: string,) => {
-  const options = {
-    title: 'Export CSV',
-    defaultPath: 'export.csv',
-    filters: [
-      { name: 'CSV Files', extensions: ['csv'] }
-    ]
-  };
+ipcMain.on(
+  'export-csv',
+  async (event, result: [], selectedGenes: string[], parquetFile: string) => {
+    const options = {
+      title: 'Export CSV',
+      defaultPath: 'export.csv',
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+    }
 
-  const filePath = await dialog.showSaveDialog(options);
+    const filePath = await dialog.showSaveDialog(options)
 
-  if (!filePath.canceled) {
-    console.log(filePath.filePath);
-  if(filePath.filePath)
-    writeToCSV(result, selectedGenes, parquetFile, filePath.filePath);
-
+    if (!filePath.canceled) {
+      console.log(filePath.filePath)
+      if (filePath.filePath) writeToCSV(result, selectedGenes, parquetFile, filePath.filePath)
+    } else {
+      console.log('Export canceled')
+      event.reply('export-csv-reply', 'Export canceled')
+    }
   }
-  else {
-    console.log("Export canceled");
-    event.reply('export-csv-reply', "Export canceled");
-  }
-
-})
+)
 
 ipcMain.on('get-resource-dir', (event) => {
-    const dir = store.get("resourceDir");
-    event.sender.send('get-resource-dir-reply', dir);
-});
+  const dir = store.get('resourceDir')
+  event.sender.send('get-resource-dir-reply', dir)
+})
 
 ipcMain.on('set-resource-dir', async (event) => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
-    title: 'Select Resource Directory',
-  });
+    title: 'Select Resource Directory'
+  })
 
   if (!result.canceled && result.filePaths.length > 0) {
-    let resourceDir = result.filePaths[0];
+    let resourceDir = result.filePaths[0]
     if (!resourceDir.endsWith(path.sep)) {
-      resourceDir += path.sep;
+      resourceDir += path.sep
     }
-    store.set("resourceDir", resourceDir);
-    event.sender.send('set-resource-dir-reply', resourceDir);
+    store.set('resourceDir', resourceDir)
+    event.sender.send('set-resource-dir-reply', resourceDir)
   }
 })
