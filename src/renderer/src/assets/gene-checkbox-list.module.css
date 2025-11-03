@@ -1,7 +1,7 @@
 .container {
   display: flex;
   flex-direction: column;
-  height: 400px;
+  height: 300px;
   border: 1px solid #ddd;
   border-radius: 8px;
   background: white;
@@ -12,7 +12,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: #f8f9fa;
   border-bottom: 1px solid #ddd;
 }
@@ -20,7 +20,7 @@
 .summaryText {
   font-weight: 600;
   color: #333;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .summaryActions {
@@ -48,16 +48,16 @@
 }
 
 .searchContainer {
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-bottom: 1px solid #eee;
 }
 
 .searchInput {
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .searchInput:focus {
@@ -79,11 +79,11 @@
 }
 
 .sectionHeader {
-  padding: 8px 16px;
+  padding: 6px 12px;
   background: #f1f3f4;
   border-bottom: 1px solid #eee;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
   color: #333;
   display: flex;
   justify-content: space-between;
@@ -105,7 +105,7 @@
 .checkboxItem {
   display: flex;
   align-items: center;
-  padding: 6px 16px;
+  padding: 4px 12px;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -120,19 +120,19 @@
 }
 
 .checkboxLabel {
-  font-size: 14px;
+  font-size: 13px;
   color: #333;
   user-select: none;
 }
 
 .toggleButton {
-  padding: 8px 16px;
+  padding: 6px 12px;
   background: none;
   border: none;
   border-top: 1px solid #eee;
   color: #007bff;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
 }
 

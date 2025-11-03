@@ -540,16 +540,6 @@ const App = (): JSX.Element => {
           </div>
 
           <div className={styles.selectedHeader}>
-            <h2>Plot Options</h2>
-            <div className={styles.selectedActions}>
-              <button onClick={(): void => setShowPlotOptions(!showPlotOptions)}>
-                {showPlotOptions ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </div>
-          {showPlotOptions && <PlotOptions plotState={plotState} setPlotState={setPlotState} />}
-
-          <div className={styles.selectedHeader}>
             <h2>Selected Points ({selectedData.length})</h2>
             <div className={styles.selectedActions}>
               <button onClick={clearSelectedData} disabled={selectedData.length === 0}>
@@ -596,6 +586,24 @@ const App = (): JSX.Element => {
           )}
         </div>
         <div className={styles.plotArea}>
+          {/* Plot Options Button - Top Right Corner */}
+          <div className={styles.plotOptionsButtonContainer}>
+            <button
+              onClick={(): void => setShowPlotOptions(!showPlotOptions)}
+              className={styles.plotOptionsButton}
+            >
+              {showPlotOptions ? 'Hide Plot Options' : 'Plot Options'}
+            </button>
+          </div>
+
+          {/* Plot Options Panel - Centered Over Plot */}
+          {showPlotOptions && (
+            <div className={styles.plotOptionsOverlay}>
+              <div className={styles.plotOptionsPanel}>
+                <PlotOptions plotState={plotState} setPlotState={setPlotState} />
+              </div>
+            </div>
+          )}
 
           {/* Temporarily disabled loading overlays for testing */}
           {/* {dataLoading && (

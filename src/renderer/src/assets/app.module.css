@@ -8,7 +8,7 @@
   width: 33%;
   display: flex;
   flex-direction: column;
-  padding: 15px;
+  padding: 10px;
 }
 
 .plotArea {
@@ -16,6 +16,59 @@
   margin: auto;
   position: relative;
   z-index: 1;
+  flex: 1;
+  height: 100vh;
+}
+
+/* Plot Options Button - Top Right Corner */
+.plotOptionsButtonContainer {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 10;
+}
+
+.plotOptionsButton {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.plotOptionsButton:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Plot Options Overlay */
+.plotOptionsOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.plotOptionsPanel {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  max-width: 400px;
+  width: 90%;
 }
 
 .loading {
@@ -33,7 +86,7 @@
 .categoryContainer {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .categoryContainer > select {
@@ -42,15 +95,15 @@
 }
 
 .geneSearch {
-  margin-top: 10px;
+  margin-top: 6px;
   position: relative;
 }
 
 .geneSearch input[type='text'] {
   width: 100%;
-  padding: 8px;
-  font-size: 16px;
-  margin: 10px 0;
+  padding: 6px;
+  font-size: 14px;
+  margin: 6px 0;
 }
 
 .searchResults {
@@ -85,9 +138,9 @@
 .badgeContainer {
   display: flex;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   overflow-y: scroll;
-  min-height: 100px;
+  min-height: 80px;
 }
 
 .selectedBadge {
@@ -104,16 +157,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 4px;
 }
 
 .selectedActions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .selectedActions > button {
   margin: auto 0;
-  padding: 6px 12px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 .selectedMessage {
@@ -124,8 +179,9 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   overflow-y: scroll;
+  max-height: 180px; /* Allow 5-6 rows to show without scrolling */
 }
 
 .dataLoadingOverlay {
@@ -159,14 +215,15 @@
 .selectedHeaderRow {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
+  padding: 4px 0;
   border-bottom: 1px solid #ddd;
   font-weight: bold;
+  font-size: 13px;
 }
 
 .cacheManagement {
-  margin: 10px 0;
-  padding: 8px;
+  margin: 6px 0;
+  padding: 6px;
   border: 1px solid #ddd;
   border-radius: 4px;
   background-color: #f9f9f9;
@@ -174,8 +231,8 @@
 
 .cacheManagement button {
   width: 100%;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
   background-color: #ff6b6b;
   color: white;
   border: none;
