@@ -1,15 +1,76 @@
+import React, { useState, useRef } from 'react'
 import { PlotState } from '@renderer/types'
 import styles from '../assets/plotOptions.module.css'
 
 interface PlotOptionsProps {
   plotState: PlotState
   setPlotState: (plotState: PlotState) => void
+  onClose?: () => void
 }
 
-const PlotOptions = ({ plotState, setPlotState }: PlotOptionsProps): JSX.Element => {
+const PlotOptions = ({ plotState, setPlotState, onClose }: PlotOptionsProps): JSX.Element => {
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const dragRef = useRef<HTMLDivElement>(null)
+  const dragOffset = useRef({ x: 0, y: 0 })
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if (dragRef.current) {
+      setIsDragging(true)
+      const rect = dragRef.current.getBoundingClientRect()
+      dragOffset.current = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      }
+    }
+  }
+
+  const handleMouseMove = (e: MouseEvent): void => {
+    if (isDragging && dragRef.current) {
+      const newX = e.clientX - dragOffset.current.x
+      const newY = e.clientY - dragOffset.current.y
+      setPosition({ x: newX, y: newY })
+    }
+  }
+
+  const handleMouseUp = (): void => {
+    setIsDragging(false)
+  }
+
+  // Add event listeners for dragging
+  React.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+    return undefined
+  }, [isDragging])
+
   return (
-    <div className={styles.container}>
-      <p className={styles.title}>Plot Options</p>
+    <div
+      ref={dragRef}
+      className={`${styles.container} ${isDragging ? styles.dragging : ''}`}
+      style={{
+        transform: `translate(${position.x}px, ${position.y}px)`,
+        cursor: isDragging ? 'grabbing' : 'default'
+      }}
+    >
+      <div
+        className={styles.header}
+        onMouseDown={handleMouseDown}
+        style={{ cursor: 'grab' }}
+      >
+        <p className={styles.title}>Plot Options</p>
+        {onClose && (
+          <button className={styles.closeButton} onClick={onClose}>
+            Hide Plot Options
+          </button>
+        )}
+      </div>
       <div className={styles.section}>
         <p className={styles.subtitle}>Minimum</p>
         <div className={styles.subsection}>

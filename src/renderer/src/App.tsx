@@ -44,7 +44,7 @@ const App = (): JSX.Element => {
   const [_minorLoading, setMinorLoading] = useState(false) // Use only for non-blocking loading
   const [_dataLoading, setDataLoading] = useState(false)
 
-  const [selectedGenes, setSelectedGenes] = useState([] as string[])
+  const [selectedGenes, setSelectedGenes] = useState(['All_Genes'] as string[])
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedData, setSelectedData] = useState<DataPoint[]>([])
   const [showPlotOptions, setShowPlotOptions] = useState(false)
@@ -195,7 +195,8 @@ const App = (): JSX.Element => {
     const newResource = resources.find((resource) => resource.category_name === selectedResource)
     setCurrentResource(newResource)
     setSelectedCategory('default')
-    setSelectedGenes([])
+    // Automatically select All_Genes when switching tissues
+    setSelectedGenes(['All_Genes'])
   }
 
   const handleCategoryChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
@@ -599,9 +600,11 @@ const App = (): JSX.Element => {
           {/* Plot Options Panel - Centered Over Plot */}
           {showPlotOptions && (
             <div className={styles.plotOptionsOverlay}>
-              <div className={styles.plotOptionsPanel}>
-                <PlotOptions plotState={plotState} setPlotState={setPlotState} />
-              </div>
+              <PlotOptions
+                plotState={plotState}
+                setPlotState={setPlotState}
+                onClose={() => setShowPlotOptions(false)}
+              />
             </div>
           )}
 
