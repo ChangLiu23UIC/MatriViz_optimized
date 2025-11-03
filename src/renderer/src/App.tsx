@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 
 /* Components */
 import Plot from './components/plot-hybrid'
-import Badge from './components/badge'
 import Row from './components/row'
-import Loading from './components/loading'
 import PlotOptions from './components/plotOptions'
+import GeneCheckboxList from './components/gene-checkbox-list'
 
 /* Services */
 import { datasetCache } from './services/dataset-cache'
@@ -46,12 +45,8 @@ const App = (): JSX.Element => {
   const [_dataLoading, setDataLoading] = useState(false)
 
   const [selectedGenes, setSelectedGenes] = useState([] as string[])
-  const [highlightedGene, setHighlightedGene] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
-  const [showAllGenes, setShowAllGenes] = useState(false)
   const [selectedData, setSelectedData] = useState<DataPoint[]>([])
-  const [searchInput, setSearchInput] = useState('')
-  const [searchResults, setSearchResults] = useState<string[]>([])
   const [showPlotOptions, setShowPlotOptions] = useState(false)
 
   const [plotState, setPlotState] = useState<PlotState>({
@@ -211,50 +206,7 @@ const App = (): JSX.Element => {
     setSelectedCategory(selectedCategory)
   }
 
-  const handleBadgeClick = (badge: string): void => {
-    setMinorLoading(true)
 
-    if (highlightedGene == '') {
-      setHighlightedGene(badge)
-      setPlotState({ ...plotState, minColor: 'grey', maxColor: 'yellow', autoMinScore: true })
-    } else {
-      setHighlightedGene('')
-      setPlotState({
-        ...plotState,
-        minColor: defaultMinColor,
-        maxColor: defaultMaxColor,
-        autoMinScore: false
-      })
-    }
-  }
-
-  const handleSearchInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>): void => {
-    const inputValue = event.target.value
-    setSearchInput(inputValue)
-
-    if (inputValue.length === 0) {
-      setSearchResults([])
-      return
-    }
-
-    const lowerInput = inputValue.toLowerCase()
-    const results: string[] = []
-
-    // Optimized search - avoid creating new arrays unnecessarily
-    for (const gene of allGenes) {
-      if (gene.toLowerCase().includes(lowerInput)) {
-        results.push(gene)
-      }
-    }
-    setSearchResults(results)
-  }, [allGenes])
-
-  const addSelectedGene = (gene: string): void => {
-    setMinorLoading(true)
-    setSelectedGenes([...selectedGenes, gene])
-    setSearchInput('')
-    setSearchResults([])
-  }
 
   // Phase 1: Load UMAP coordinates when tissue changes (fast)
   useEffect(() => {
@@ -366,19 +318,18 @@ const App = (): JSX.Element => {
   useEffect(() => {
     const computeGeneExpression = async (): Promise<void> => {
       // Only compute gene expression if genes are actually selected
-      if (!currentResource || (selectedGenes.length === 0 && highlightedGene === '')) {
+      if (!currentResource || selectedGenes.length === 0) {
         return
       }
 
       console.log('Computing gene expression for resource:', currentResource.category_name);
       console.log('Selected genes:', selectedGenes);
-      console.log('Highlighted gene:', highlightedGene);
 
       // Create cache key for this specific gene combination
       const cacheKey = datasetCache.generateCacheKey(
         currentResource.parquet_file,
         selectedGenes,
-        highlightedGene
+        ''
       )
 
       // Check if gene expression data is already cached in IndexedDB
@@ -395,7 +346,7 @@ const App = (): JSX.Element => {
       }
 
       // Check if gene expression data is cached in memory
-      const memoryCacheKey = `${currentResource.parquet_file}_${[...selectedGenes].sort().join('_')}_${highlightedGene}`
+      const memoryCacheKey = `${currentResource.parquet_file}_${[...selectedGenes].sort().join('_')}`
       if (dataCache[memoryCacheKey]) {
         console.log('Using memory cached gene expression data for key:', memoryCacheKey);
         setData(dataCache[memoryCacheKey])
@@ -406,10 +357,7 @@ const App = (): JSX.Element => {
       console.log('No cached gene expression data found, computing with DuckDB');
       setMinorLoading(true)
       try {
-        let selection: string[] = []
-
-        if (highlightedGene != '') selection = [highlightedGene]
-        else selection = selectedGenes
+        const selection = selectedGenes
 
         // Use DuckDB for gene expression calculations
         console.log('Using DuckDB for gene expression calculations');
@@ -488,7 +436,7 @@ const App = (): JSX.Element => {
     }
 
     computeGeneExpression()
-  }, [selectedGenes, highlightedGene, currentResource, resourcesDir])
+  }, [selectedGenes, currentResource, resourcesDir])
 
   const handleSelectedData = (selectedData: DataPoint[]): void => {
     setSelectedData(selectedData)
@@ -524,10 +472,6 @@ const App = (): JSX.Element => {
     setSelectedData(updatedSelectedData)
   }, [data, selectedGenes])
 
-  const removeGene = (geneToRemove: string): void => {
-    setMinorLoading(true)
-    setSelectedGenes(selectedGenes.filter((gene) => gene !== geneToRemove))
-  }
 
   const clearDataCache = async (): Promise<void> => {
     // Clear memory cache
@@ -582,50 +526,12 @@ const App = (): JSX.Element => {
           </div>
 
           <h2>Selected Genes</h2>
-          <div className={styles.geneSearch}>
-            <input
-              type="text"
-              placeholder="Search for a gene..."
-              value={searchInput}
-              onChange={handleSearchInputChange}
-              disabled={geneListLoading}
-            />
-            {geneListLoading && (
-              <div className={styles.loadingIndicator}>
-                <Loading height={16} width={16} text={false} />
-                <span>Loading gene list...</span>
-              </div>
-            )}
-            <div className={styles.searchResults}>
-              {searchResults.map((gene) => (
-                <div
-                  key={gene}
-                  className={styles.searchResultItem}
-                  onClick={(): void => addSelectedGene(gene)}
-                >
-                  {gene}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className={styles.badgeContainer}>
-            {/* If showAllGenes is selected, map all. Otherwise, only map 10 */}
-            {selectedGenes.slice(0, showAllGenes ? selectedGenes.length : 10).map((gene) => (
-              <Badge
-                key={gene}
-                gene={gene}
-                handleBadgeClick={handleBadgeClick}
-                removeGene={removeGene}
-                isHighlighted={highlightedGene === gene}
-              />
-            ))}
-            {!showAllGenes && <span className={styles.ellipsis}>...</span>}
-          </div>
-          {selectedGenes.length > 10 && (
-            <button onClick={(): void => setShowAllGenes(!showAllGenes)}>
-              {showAllGenes ? 'Hide' : 'See All'}
-            </button>
-          )}
+          <GeneCheckboxList
+            allGenes={allGenes}
+            selectedGenes={selectedGenes}
+            onSelectionChange={setSelectedGenes}
+            disabled={geneListLoading}
+          />
 
           <div className={styles.cacheManagement}>
             <button onClick={clearDataCache}>

@@ -12,7 +12,8 @@
       "Bash(npm install:*)",
       "Bash(npm run typecheck:web)",
       "Bash(rm:*)",
-      "Bash(npm run build)"
+      "Bash(npm run build)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []
