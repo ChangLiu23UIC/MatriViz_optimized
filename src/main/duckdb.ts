@@ -43,7 +43,7 @@ class DuckDBMainService {
       // Execute the query directly
       const result = await new Promise<any[]>((resolve, reject) => {
         this.connection!.all(`
-          SELECT ${columns.join(', ')}
+          SELECT ${columns.map(col => `"${col}"`).join(', ')}
           FROM read_parquet('${filePath}')
         `, (err, result) => {
           if (err) reject(err)
@@ -70,7 +70,8 @@ class DuckDBMainService {
   async queryParquetFileWithExpression(
     filePath: string,
     geneColumns: string[],
-    expressionColumns: string[]
+    expressionColumns: string[],
+    whereClause: string = ''
   ): Promise<DuckDBQueryResult> {
     if (!this.connection) {
       throw new Error('DuckDB not initialized')
@@ -83,7 +84,7 @@ class DuckDBMainService {
     try {
       // Calculate average expression per cell
       const avgExpression = expressionColumns
-        .map(col => `CAST(${col} AS FLOAT)`)
+        .map(col => `CAST(\"${col}\" AS FLOAT)`)
         .join(' + ')
 
       const avgExpressionSql = expressionColumns.length > 1
@@ -93,9 +94,10 @@ class DuckDBMainService {
       const result = await new Promise<any[]>((resolve, reject) => {
         this.connection!.all(`
           SELECT
-            ${geneColumns.join(', ')},
+            ${geneColumns.map(col => `"${col}"`).join(', ')},
             ${avgExpressionSql} as avg_expression
           FROM read_parquet('${filePath}')
+          ${whereClause}
         `, (err, result) => {
           if (err) reject(err)
           else resolve(result)

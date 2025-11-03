@@ -33,7 +33,8 @@ declare global {
       queryParquetFileWithExpression: (
         filePath: string,
         geneColumns: string[],
-        expressionColumns: string[]
+        expressionColumns: string[],
+        whereClause?: string
       ) => Promise<{
         columns: string[]
         data: any[][]

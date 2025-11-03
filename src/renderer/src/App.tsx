@@ -31,7 +31,8 @@ const App = (): JSX.Element => {
   const [geneCache, setGeneCache] = useState<Record<string, string[]>>({}) // Cache for gene lists by parquet file
   const [dataCache, setDataCache] = useState<Record<string, DataPoint[]>>({}) // Cache for processed data by parquet file + genes
 
-  const [data, setData] = useState<DataPoint[]>([])
+  const [baseData, setBaseData] = useState<DataPoint[]>([]) // Base UMAP coordinates without expression
+  const [data, setData] = useState<DataPoint[]>([]) // Current data with expression scores
   const [labels, setLabels] = useState<LabelPoint[]>([])
   const [plotSelectedPoints, setPlotSelectedPoints] = useState<DataPoint[]>([]) // Lifted state from Plot
 
@@ -231,6 +232,7 @@ const App = (): JSX.Element => {
         const cachedData = await datasetCache.get(umapCacheKey);
         if (cachedData) {
           console.log('Using cached UMAP coordinates for key:', umapCacheKey);
+          setBaseData(cachedData)
           setData(cachedData)
           setDataLoading(false)
           setLoading(false)
@@ -245,6 +247,7 @@ const App = (): JSX.Element => {
       const memoryCacheKey = `${currentResource.parquet_file}_umap_only`
       if (dataCache[memoryCacheKey]) {
         console.log('Using memory cached UMAP coordinates for key:', memoryCacheKey);
+        setBaseData(dataCache[memoryCacheKey])
         setData(dataCache[memoryCacheKey])
         setDataLoading(false)
         setLoading(false)
@@ -273,6 +276,7 @@ const App = (): JSX.Element => {
         }))
 
         console.log('Processed UMAP points:', processedData.length);
+        setBaseData(processedData)
         setData(processedData)
 
         // Cache UMAP coordinates in memory
@@ -303,6 +307,7 @@ const App = (): JSX.Element => {
           hasExpressionData: false
         }))
 
+        setBaseData(processedData)
         setData(processedData)
         setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
       } finally {
@@ -319,18 +324,25 @@ const App = (): JSX.Element => {
   useEffect(() => {
     const computeGeneExpression = async (): Promise<void> => {
       // Only compute gene expression if genes are actually selected
-      if (!currentResource || selectedGenes.length === 0) {
+      if (!currentResource || selectedGenes.length === 0 || baseData.length === 0) {
         return
       }
 
       console.log('Computing gene expression for resource:', currentResource.category_name);
       console.log('Selected genes:', selectedGenes);
+      console.log('Selected points count:', selectedData.length);
+
+      // Determine if we should compute for subset or all points
+      const computeForSubset = selectedData.length > 0;
+      const targetIndices = computeForSubset ? selectedData.map(p => p.index) : baseData.map(p => p.index);
+
+      console.log('Computing expression for:', computeForSubset ? 'subset' : 'all points');
 
       // Create cache key for this specific gene combination
       const cacheKey = datasetCache.generateCacheKey(
         currentResource.parquet_file,
         selectedGenes,
-        ''
+        computeForSubset ? 'subset_' + targetIndices.join('_') : ''
       )
 
       // Check if gene expression data is already cached in IndexedDB
@@ -347,7 +359,7 @@ const App = (): JSX.Element => {
       }
 
       // Check if gene expression data is cached in memory
-      const memoryCacheKey = `${currentResource.parquet_file}_${[...selectedGenes].sort().join('_')}`
+      const memoryCacheKey = `${currentResource.parquet_file}_${[...selectedGenes].sort().join('_')}_${computeForSubset ? 'subset' : 'all'}`
       if (dataCache[memoryCacheKey]) {
         console.log('Using memory cached gene expression data for key:', memoryCacheKey);
         setData(dataCache[memoryCacheKey])
@@ -363,10 +375,15 @@ const App = (): JSX.Element => {
         // Use DuckDB for gene expression calculations
         console.log('Using DuckDB for gene expression calculations');
         try {
+          // Build WHERE clause for subset computation if needed
+          const whereClause = computeForSubset ? `WHERE index IN (${targetIndices.map(idx => `'${idx}'`).join(', ')})` : '';
+          const quotedSelection = selection.map(gene => `"${gene}"`).join(' + ');
+
           const result = await window.duckdb.queryParquetFileWithExpression(
             resourcesDir + currentResource.parquet_file,
             ['umap_1', 'umap_2', 'index'],
-            selection
+            selection,
+            whereClause
           )
 
           const processedData = result.data.map((row: any[]) => ({
@@ -394,7 +411,7 @@ const App = (): JSX.Element => {
 
           // Cache gene expression data in IndexedDB
           try {
-            const query = `SELECT umap_1, umap_2, index, AVG(${selection.join(' + ')}) as avg_expression FROM parquet_file GROUP BY umap_1, umap_2, index`;
+            const query = `SELECT umap_1, umap_2, index, AVG(${quotedSelection}) as avg_expression FROM parquet_file ${whereClause} GROUP BY umap_1, umap_2, index`;
             await datasetCache.set(cacheKey, processedData, query);
             console.log('Gene expression data cached in IndexedDB with key:', cacheKey);
           } catch (cacheError) {
@@ -437,7 +454,7 @@ const App = (): JSX.Element => {
     }
 
     computeGeneExpression()
-  }, [selectedGenes, currentResource, resourcesDir])
+  }, [selectedGenes, currentResource, resourcesDir, baseData, selectedData])
 
   const handleSelectedData = (selectedData: DataPoint[]): void => {
     setSelectedData(selectedData)
