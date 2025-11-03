@@ -15,15 +15,7 @@ interface ProcessedData {
 }
 
 class DataProcessor {
-  private dataCache = new Map<string, ProcessedData>();
-
   processDataForGPU(data: DataPoint[]): ProcessedData {
-    const cacheKey = this.generateCacheKey(data);
-
-    if (this.dataCache.has(cacheKey)) {
-      return this.dataCache.get(cacheKey)!;
-    }
-
     console.log('Processing data for GPU, data length:', data.length);
     if (data.length > 0) {
       console.log('First data point:', data[0]);
@@ -77,7 +69,6 @@ class DataProcessor {
       }
     };
 
-    this.dataCache.set(cacheKey, processedData);
     return processedData;
   }
 
@@ -148,15 +139,6 @@ class DataProcessor {
     return normalized;
   }
 
-  private generateCacheKey(data: DataPoint[]): string {
-    // Simple cache key based on data length and first few points
-    const keyData = data.slice(0, 10).map(p => `${p.index}:${p.score}`).join('|');
-    return `${data.length}:${keyData}`;
-  }
-
-  clearCache(): void {
-    this.dataCache.clear();
-  }
 }
 
 export const dataProcessor = new DataProcessor();

@@ -7,7 +7,6 @@ import PlotOptions from './components/plotOptions'
 import GeneCheckboxList from './components/gene-checkbox-list'
 
 /* Services */
-import { datasetCache } from './services/dataset-cache'
 
 /* Styles */
 import styles from './assets/app.module.css'
@@ -28,8 +27,6 @@ const App = (): JSX.Element => {
   const [categories, setCategories] = useState<Record<string, string[]>>({})
   const [allGenes, setAllGenes] = useState([] as string[]) // Columns from parquet file
   const [geneListLoading, setGeneListLoading] = useState(false)
-  const [geneCache, setGeneCache] = useState<Record<string, string[]>>({}) // Cache for gene lists by parquet file
-  const [dataCache, setDataCache] = useState<Record<string, DataPoint[]>>({}) // Cache for processed data by parquet file + genes
 
   const [baseData, setBaseData] = useState<DataPoint[]>([]) // Base UMAP coordinates without expression
   const [data, setData] = useState<DataPoint[]>([]) // Current data with expression scores
@@ -161,13 +158,7 @@ const App = (): JSX.Element => {
 
     const parquetFilePath = resourcesDir + currentResource.parquet_file
 
-    // Check if gene list is already cached
-    if (geneCache[parquetFilePath]) {
-      setAllGenes(geneCache[parquetFilePath])
-      return
-    }
-
-    // If not cached, fetch and cache it
+    // Fetch gene list
     setGeneListLoading(true)
 
     // Try DuckDB first, fallback to native parquet service
@@ -175,20 +166,18 @@ const App = (): JSX.Element => {
       try {
         const columns = await window.duckdb.getParquetColumns(parquetFilePath)
         setAllGenes(columns)
-        setGeneCache((prev) => ({ ...prev, [parquetFilePath]: columns }))
       } catch (duckdbError) {
         console.error('DuckDB column fetch failed, falling back to native service:', duckdbError)
         // Fallback to native parquet service
         const columns = await window.parquet.getParquetColumns(parquetFilePath)
         setAllGenes(columns)
-        setGeneCache((prev) => ({ ...prev, [parquetFilePath]: columns }))
       } finally {
         setGeneListLoading(false)
       }
     }
 
     fetchColumns()
-  }, [currentResource, geneCache, resourcesDir])
+  }, [currentResource, resourcesDir])
 
   const handleResourceChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
     setLoading(true)
@@ -220,42 +209,7 @@ const App = (): JSX.Element => {
 
       console.log('Loading UMAP coordinates for resource:', currentResource.category_name);
 
-      // Create cache key for UMAP coordinates only
-      const umapCacheKey = datasetCache.generateCacheKey(
-        currentResource.parquet_file,
-        [], // No genes - just UMAP coordinates
-        ''  // No highlighted gene
-      )
-
-      // Check if UMAP coordinates are already cached in IndexedDB
-      try {
-        const cachedData = await datasetCache.get(umapCacheKey);
-        if (cachedData) {
-          console.log('Using cached UMAP coordinates for key:', umapCacheKey);
-          setBaseData(cachedData)
-          setData(cachedData)
-          setDataLoading(false)
-          setLoading(false)
-          setMinorLoading(false)
-          return
-        }
-      } catch (cacheError) {
-        console.log('IndexedDB cache check failed, falling back to memory cache:', cacheError);
-      }
-
-      // Check if UMAP coordinates are cached in memory
-      const memoryCacheKey = `${currentResource.parquet_file}_umap_only`
-      if (dataCache[memoryCacheKey]) {
-        console.log('Using memory cached UMAP coordinates for key:', memoryCacheKey);
-        setBaseData(dataCache[memoryCacheKey])
-        setData(dataCache[memoryCacheKey])
-        setDataLoading(false)
-        setLoading(false)
-        setMinorLoading(false)
-        return
-      }
-
-      console.log('No cached UMAP coordinates found, fetching from DuckDB');
+      console.log('Fetching UMAP coordinates from DuckDB');
       setDataLoading(true)
       try {
         // Always fetch only UMAP coordinates initially
@@ -278,18 +232,6 @@ const App = (): JSX.Element => {
         console.log('Processed UMAP points:', processedData.length);
         setBaseData(processedData)
         setData(processedData)
-
-        // Cache UMAP coordinates in memory
-        setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
-
-        // Cache UMAP coordinates in IndexedDB
-        try {
-          const query = 'SELECT umap_1, umap_2, index FROM parquet_file';
-          await datasetCache.set(umapCacheKey, processedData, query);
-          console.log('UMAP coordinates cached in IndexedDB with key:', umapCacheKey);
-        } catch (cacheError) {
-          console.error('Failed to cache UMAP coordinates in IndexedDB:', cacheError);
-        }
       } catch (duckdbError) {
         console.error('DuckDB query failed, falling back to native parquet service:', duckdbError);
         // Fallback to native parquet service
@@ -309,7 +251,6 @@ const App = (): JSX.Element => {
 
         setBaseData(processedData)
         setData(processedData)
-        setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
       } finally {
         setDataLoading(false)
         setLoading(false)
@@ -338,36 +279,7 @@ const App = (): JSX.Element => {
 
       console.log('Computing expression for:', computeForSubset ? 'subset' : 'all points');
 
-      // Create cache key for this specific gene combination
-      const cacheKey = datasetCache.generateCacheKey(
-        currentResource.parquet_file,
-        selectedGenes,
-        computeForSubset ? 'subset_' + targetIndices.join('_') : ''
-      )
-
-      // Check if gene expression data is already cached in IndexedDB
-      try {
-        const cachedData = await datasetCache.get(cacheKey);
-        if (cachedData) {
-          console.log('Using cached gene expression data for key:', cacheKey);
-          setData(cachedData)
-          setMinorLoading(false)
-          return
-        }
-      } catch (cacheError) {
-        console.log('IndexedDB cache check failed, falling back to memory cache:', cacheError);
-      }
-
-      // Check if gene expression data is cached in memory
-      const memoryCacheKey = `${currentResource.parquet_file}_${[...selectedGenes].sort().join('_')}_${computeForSubset ? 'subset' : 'all'}`
-      if (dataCache[memoryCacheKey]) {
-        console.log('Using memory cached gene expression data for key:', memoryCacheKey);
-        setData(dataCache[memoryCacheKey])
-        setMinorLoading(false)
-        return
-      }
-
-      console.log('No cached gene expression data found, computing with DuckDB');
+      console.log('Computing gene expression data with DuckDB');
       setMinorLoading(true)
       try {
         const selection = selectedGenes
@@ -377,7 +289,6 @@ const App = (): JSX.Element => {
         try {
           // Build WHERE clause for subset computation if needed
           const whereClause = computeForSubset ? `WHERE index IN (${targetIndices.map(idx => `'${idx}'`).join(', ')})` : '';
-          const quotedSelection = selection.map(gene => `"${gene}"`).join(' + ');
 
           const result = await window.duckdb.queryParquetFileWithExpression(
             resourcesDir + currentResource.parquet_file,
@@ -405,18 +316,6 @@ const App = (): JSX.Element => {
           console.log('Gene expression score range:', minScore, 'to', maxScore)
 
           setData(processedData)
-
-          // Cache gene expression data in memory
-          setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
-
-          // Cache gene expression data in IndexedDB
-          try {
-            const query = `SELECT umap_1, umap_2, index, AVG(${quotedSelection}) as avg_expression FROM parquet_file ${whereClause} GROUP BY umap_1, umap_2, index`;
-            await datasetCache.set(cacheKey, processedData, query);
-            console.log('Gene expression data cached in IndexedDB with key:', cacheKey);
-          } catch (cacheError) {
-            console.error('Failed to cache gene expression data in IndexedDB:', cacheError);
-          }
         } catch (duckdbError) {
           console.error('DuckDB query failed, falling back to native parquet service:', duckdbError);
           // Fallback to native parquet service
@@ -444,7 +343,6 @@ const App = (): JSX.Element => {
 
           processedData.sort((a, b) => a.score - b.score)
           setData(processedData)
-          setDataCache((prev) => ({ ...prev, [memoryCacheKey]: processedData }))
         }
       } catch (error) {
         console.error('Error computing gene expression:', error)
@@ -491,18 +389,6 @@ const App = (): JSX.Element => {
   }, [data, selectedGenes])
 
 
-  const clearDataCache = async (): Promise<void> => {
-    // Clear memory cache
-    setDataCache({})
-
-    // Clear IndexedDB cache
-    try {
-      await datasetCache.clear();
-      console.log('IndexedDB cache cleared');
-    } catch (error) {
-      console.error('Failed to clear IndexedDB cache:', error);
-    }
-  }
 
 
   return (
@@ -551,11 +437,6 @@ const App = (): JSX.Element => {
             disabled={geneListLoading}
           />
 
-          <div className={styles.cacheManagement}>
-            <button onClick={clearDataCache}>
-              Clear Cache ({Object.keys(dataCache).length} datasets cached)
-            </button>
-          </div>
 
           <div className={styles.selectedHeader}>
             <h2>Selected Points ({selectedData.length})</h2>

@@ -68,9 +68,6 @@ const GeneCheckboxList = ({
     onSelectionChange(['All_Genes'])
   }
 
-  const handleClearAll = () => {
-    onSelectionChange([])
-  }
 
   const totalSelected = selectedGenes.includes('All_Genes')
     ? 'All Genes'
@@ -88,13 +85,6 @@ const GeneCheckboxList = ({
             className={styles.actionButton}
           >
             Select All
-          </button>
-          <button
-            onClick={handleClearAll}
-            disabled={disabled || selectedGenes.length === 0}
-            className={styles.actionButton}
-          >
-            Clear All
           </button>
         </div>
       </div>
