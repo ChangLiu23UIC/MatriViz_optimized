@@ -21,7 +21,6 @@ const App = (): JSX.Element => {
 
   const [resourcesDir, setResourcesDir] = useState<string>('./')
   const [resourcesLoading, setResourcesLoading] = useState(false)
-  const [lastResourcesDir, setLastResourcesDir] = useState<string>('./')
   const [resources, setResources] = useState<ResourceFile[]>([])
   const [currentResource, setCurrentResource] = useState<ResourceFile>()
   const [categories, setCategories] = useState<Record<string, string[]>>({})
@@ -63,7 +62,9 @@ const App = (): JSX.Element => {
 
   const handleResourceDirectorySelection = (): void => {
     window.resources.setResourceDir().then((result) => {
-      setResourcesDir(result)
+      if (result) {
+        setResourcesDir(result)
+      }
     })
   }
 
@@ -92,19 +93,22 @@ const App = (): JSX.Element => {
 
   useEffect(() => {
     window.resources.getResourceDir().then((dir) => {
-      setResourcesDir(dir)
+      // Only set the directory if it exists and is valid
+      // Don't automatically load resources
+      if (dir && dir !== './') {
+        setResourcesDir(dir)
+      } else {
+        // No valid directory stored, prompt user to select one
+        handleResourceDirectorySelection()
+      }
     })
 
     // Canvas rendering only - WebGL disabled
     console.log('Canvas rendering only - WebGL disabled');
   }, [])
 
-  useEffect(() => {
-    if (resourcesDir !== lastResourcesDir) {
-      setLastResourcesDir(resourcesDir)
-      populateResources()
-    }
-  }, [resourcesDir, lastResourcesDir])
+  // Manual resource loading - only populate when explicitly triggered
+  // Removed automatic population on directory change
 
   useEffect(() => {
     if (!currentResource) return
@@ -398,19 +402,24 @@ const App = (): JSX.Element => {
           <h1>MatriViz</h1>
           <h2>Category</h2>
           <div className={styles.categoryContainer}>
-            {resources.length === 0 ? (
-              <div>
-                <p>
-                  No resources found in directory {resourcesDir} <br></br>Please select a resource
-                  directory:
-                </p>
+            <div>
+              <p>
+                Current directory: {resourcesDir}
+              </p>
+              <div className={styles.directoryActions}>
                 <button onClick={(): void => handleResourceDirectorySelection()}>
-                  Select Resource Directory
+                  Change Directory
                 </button>
+                {resources.length === 0 && (
+                  <button onClick={(): void => populateResources()}>
+                    Load Resources
+                  </button>
+                )}
               </div>
-            ) : (
+            </div>
+            {resources.length > 0 && (
               <>
-                <select onClick={populateResources} onChange={handleResourceChange}>
+                <select onChange={handleResourceChange}>
                   {resources.map((resource) => (
                     <option key={resource.category_name} value={resource.category_name}>
                       {resource.category_description}

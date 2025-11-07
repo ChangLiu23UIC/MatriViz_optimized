@@ -84,6 +84,25 @@
   padding: 8px;
 }
 
+.directoryActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.directoryActions > button {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+  cursor: pointer;
+}
+
+.directoryActions > button:hover {
+  background-color: #e9e9e9;
+}
+
 .geneSearch {
   margin-top: 6px;
   position: relative;
