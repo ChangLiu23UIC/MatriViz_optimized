@@ -152,7 +152,11 @@ ipcMain.on('query-parquet-file', async (event, filePath: string, query?: string[
     const json = await queryParquetFile(filePath, query)
     event.reply('query-parquet-file-reply', json)
   } catch (error) {
-    event.reply('query-parquet-file-reply', error)
+    // Ensure error is properly serialized
+    const errorObj = error instanceof Error
+      ? { message: error.message, stack: error.stack, name: error.name }
+      : { message: String(error) }
+    event.reply('query-parquet-file-reply', errorObj)
   }
 })
 

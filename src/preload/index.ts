@@ -42,7 +42,13 @@ if (process.contextIsolated) {
         return new Promise((resolve, reject) => {
           ipcRenderer.send('query-parquet-file', filePath, query)
           ipcRenderer.once('query-parquet-file-reply', (_, response) => {
-            if (response instanceof Error) {
+            // Check if response is an error object (from main process error serialization)
+            if (response && typeof response === 'object' && response.message) {
+              const error = new Error(response.message)
+              if (response.stack) error.stack = response.stack
+              if (response.name) error.name = response.name
+              reject(error)
+            } else if (response instanceof Error) {
               reject(response)
             } else {
               resolve(response)

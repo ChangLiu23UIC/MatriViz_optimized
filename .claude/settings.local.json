@@ -13,7 +13,9 @@
       "Bash(npm run typecheck:web)",
       "Bash(rm:*)",
       "Bash(npm run build)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(dir:*)",
+      "Read(//e/UIC_PHD/Azimuth_11072025/test/**)"
     ],
     "deny": [],
     "ask": []

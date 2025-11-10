@@ -44,5 +44,8 @@ export const getAllColumns = async (filePath: string): Promise<string[]> => {
   const reader = await parquet.ParquetReader.openFile(filePath)
   const schema = reader.getSchema()
   const columns = schema.fieldList.map((field) => field.name)
-  return columns
+
+  // Filter out default coordinate columns that should not be selectable as genes
+  const defaultColumns = ['index', 'umap_1', 'umap_2']
+  return columns.filter(column => !defaultColumns.includes(column.toLowerCase()))
 }

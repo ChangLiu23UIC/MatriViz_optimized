@@ -1,4 +1,5 @@
 import { readdir, readFile } from 'fs/promises'
+import path from 'path'
 import { ResourceFile } from '../types/types'
 
 export const getResourceList = async (dirPath: string): Promise<ResourceFile[]> => {
@@ -7,7 +8,7 @@ export const getResourceList = async (dirPath: string): Promise<ResourceFile[]> 
   for (const file of files) {
     if (file.endsWith('.json')) {
       try {
-        const data = await readFile(dirPath + '/' + file, 'utf8')
+        const data = await readFile(dirPath + path.sep + file, 'utf8')
         const json = JSON.parse(data)
         if (json['fileType'] === 'matriviz') {
           console.log(json as ResourceFile)

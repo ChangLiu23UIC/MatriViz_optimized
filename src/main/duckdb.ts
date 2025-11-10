@@ -42,9 +42,11 @@ class DuckDBMainService {
     try {
       // Execute the query directly
       const result = await new Promise<any[]>((resolve, reject) => {
+        // Escape backslashes in file path for SQL query
+        const escapedFilePath = filePath.replace(/\\/g, '\\\\')
         this.connection!.all(`
           SELECT ${columns.map(col => `"${col}"`).join(', ')}
-          FROM read_parquet('${filePath}')
+          FROM read_parquet('${escapedFilePath}')
         `, (err, result) => {
           if (err) reject(err)
           else resolve(result)
@@ -91,12 +93,14 @@ class DuckDBMainService {
         ? `(${avgExpression}) / ${expressionColumns.length}`
         : avgExpression
 
+      // Escape backslashes in file path for SQL query
+      const escapedFilePath = filePath.replace(/\\/g, '\\\\')
       const result = await new Promise<any[]>((resolve, reject) => {
         this.connection!.all(`
           SELECT
             ${geneColumns.map(col => `"${col}"`).join(', ')},
             ${avgExpressionSql} as avg_expression
-          FROM read_parquet('${filePath}')
+          FROM read_parquet('${escapedFilePath}')
           ${whereClause}
         `, (err, result) => {
           if (err) reject(err)
@@ -126,16 +130,22 @@ class DuckDBMainService {
     }
 
     try {
+      // Escape backslashes in file path for SQL query
+      const escapedFilePath = filePath.replace(/\\/g, '\\\\')
       const result = await new Promise<any[]>((resolve, reject) => {
         this.connection!.all(`
-          DESCRIBE SELECT * FROM read_parquet('${filePath}')
+          DESCRIBE SELECT * FROM read_parquet('${escapedFilePath}')
         `, (err, result) => {
           if (err) reject(err)
           else resolve(result)
         })
       })
 
-      return result.map(row => row.column_name as string)
+      // Filter out default coordinate columns that should not be selectable as genes
+      const defaultColumns = ['index', 'umap_1', 'umap_2']
+      return result
+        .map(row => row.column_name as string)
+        .filter(column => !defaultColumns.includes(column.toLowerCase()))
     } catch (error) {
       console.error('Error getting parquet columns with DuckDB:', error)
       throw error

@@ -61,29 +61,56 @@ const App = (): JSX.Element => {
   })
 
   const handleResourceDirectorySelection = (): void => {
+    console.log('Starting directory change process...')
     window.resources.setResourceDir().then((result) => {
       if (result) {
+        console.log('Directory changed to:', result)
+        // Reset all state when directory changes
         setResourcesDir(result)
+        setResources([])
+        setCurrentResource(undefined)
+        setCategories({})
+        setAllGenes([])
+        setBaseData([])
+        setData([])
+        setLabels([])
+        setSelectedGenes(['All_Genes'])
+        setSelectedCategory('')
+        setSelectedData([])
+
+        // Use the new directory directly for resource loading
+        console.log('Loading resources from new directory...')
+        // Use setTimeout to ensure state is reset before loading resources
+        setTimeout(() => {
+          populateResourcesWithDir(result)
+        }, 0)
       }
     })
   }
 
-  const populateResources = (): void => {
-    if (resourcesLoading) return // Prevent multiple simultaneous calls
+  const populateResourcesWithDir = (dir: string): void => {
+    if (resourcesLoading) {
+      console.log('Resource loading already in progress, skipping...')
+      return // Prevent multiple simultaneous calls
+    }
 
+    console.log('Starting resource loading from directory:', dir)
     setResourcesLoading(true)
-    window.resources.getResourceList(resourcesDir).then((files) => {
+    window.resources.getResourceList(dir).then((files) => {
+      console.log('Resource files found:', files.length)
       if (files.length == 0) {
         // No files found.
         setLoading(false)
-        console.error('No files found in directory:', resourcesDir)
+        console.error('No files found in directory:', dir)
         setResourcesLoading(false)
         return
       }
       setResources(files as ResourceFile[])
-      if (currentResource === undefined && files.length > 0)
-        // If no resource is selected, select the first one
-        setCurrentResource(files[0])
+
+      // Always set the first resource when loading from a new directory
+      console.log('Setting current resource to first file:', files[0].category_name)
+      setCurrentResource(files[0])
+
       setResourcesLoading(false)
     }).catch((error) => {
       console.error('Error loading resources:', error)
@@ -91,12 +118,17 @@ const App = (): JSX.Element => {
     })
   }
 
+  const populateResources = (): void => {
+    populateResourcesWithDir(resourcesDir)
+  }
+
   useEffect(() => {
     window.resources.getResourceDir().then((dir) => {
       // Only set the directory if it exists and is valid
-      // Don't automatically load resources
       if (dir && dir !== './') {
         setResourcesDir(dir)
+        // Automatically load resources when directory is set from storage
+        populateResourcesWithDir(dir)
       } else {
         // No valid directory stored, prompt user to select one
         handleResourceDirectorySelection()
@@ -133,10 +165,83 @@ const App = (): JSX.Element => {
     const loadCentroidData = async (): Promise<void> => {
       try {
         console.log('Loading centroid data for tissue:', currentResource.category_name)
-        const centroidData = await window.parquet.queryParquetFile(
-          resourcesDir + currentResource.centroid_file,
-          ['cen_x', 'cen_y', 'Type']
-        )
+        console.log('Centroid file path:', resourcesDir + currentResource.centroid_file)
+
+        // First, let's check what columns are available in the centroid file
+        try {
+          const availableColumns = await window.parquet.getParquetColumns(
+            resourcesDir + currentResource.centroid_file
+          )
+          console.log('Available columns in centroid file (native):', availableColumns)
+        } catch (columnError) {
+          console.error('Error getting centroid file columns (native):', columnError)
+        }
+
+        // Also try DuckDB to check columns
+        try {
+          const duckdbColumns = await window.duckdb.getParquetColumns(
+            resourcesDir + currentResource.centroid_file
+          )
+          console.log('Available columns in centroid file (DuckDB):', duckdbColumns)
+        } catch (duckdbColumnError) {
+          console.error('Error getting centroid file columns (DuckDB):', duckdbColumnError)
+        }
+
+        // File existence check - we'll rely on the error messages from the parquet libraries
+
+        let centroidData
+
+        // Try native parquet first
+        try {
+          centroidData = await window.parquet.queryParquetFile(
+            resourcesDir + currentResource.centroid_file,
+            ['cen_x', 'cen_y', 'Type']
+          )
+          console.log('Native parquet query completed')
+
+          // Check if we got an error message instead of data
+          if (typeof centroidData === 'string' && centroidData.includes('invalid parquet version')) {
+            console.log('Native parquet returned error message, triggering DuckDB fallback')
+            throw new Error(`Native parquet version error: ${centroidData}`)
+          }
+
+          console.log('Centroid data loaded via native parquet')
+        } catch (nativeError) {
+          console.error('Native parquet query failed:', nativeError)
+          // Fallback to DuckDB
+          try {
+            console.log('Falling back to DuckDB for centroid data')
+            console.log('DuckDB file path:', resourcesDir + currentResource.centroid_file)
+            const duckdbResult = await window.duckdb.queryParquetFile(
+              resourcesDir + currentResource.centroid_file,
+              ['cen_x', 'cen_y', 'Type']
+            )
+            console.log('DuckDB result structure:', duckdbResult)
+            console.log('DuckDB columns:', duckdbResult.columns)
+            console.log('DuckDB data length:', duckdbResult.data?.length)
+            centroidData = duckdbResult.data
+            console.log('Centroid data loaded via DuckDB fallback')
+          } catch (duckdbError) {
+            console.error('DuckDB fallback also failed:', duckdbError)
+            console.error('DuckDB error details:', {
+              message: duckdbError.message,
+              stack: duckdbError.stack
+            })
+            throw new Error(`Both native parquet and DuckDB failed to load centroid data: ${nativeError.message}, ${duckdbError.message}`)
+          }
+        }
+
+        console.log('Raw centroid data received:', centroidData)
+        console.log('Type of centroidData:', typeof centroidData)
+        console.log('Is centroidData an array?', Array.isArray(centroidData))
+        if (centroidData && typeof centroidData === 'object') {
+          console.log('centroidData keys:', Object.keys(centroidData))
+        }
+
+        // Check if we actually got an array of data
+        if (!Array.isArray(centroidData)) {
+          throw new Error(`Expected array but got: ${typeof centroidData}. Data: ${JSON.stringify(centroidData)}`)
+        }
 
         const processedCentroidData = centroidData.map((d) => ({
           x: parseFloat(d.cen_x as string),
@@ -151,6 +256,13 @@ const App = (): JSX.Element => {
         setLabels(processedCentroidData)
       } catch (error) {
         console.error('Error loading centroid data:', error)
+        console.error('Error details:', {
+          directory: resourcesDir,
+          centroidFile: currentResource.centroid_file,
+          fullPath: resourcesDir + currentResource.centroid_file
+        })
+        // Set empty labels as fallback - the application should still work without centroids
+        setLabels([])
       }
     }
 
