@@ -27,16 +27,29 @@ const GeneCheckboxList = ({
   }, [allGenes, searchTerm])
 
   // Separate selected and unselected genes
-  const { selectedGeneList, unselectedGeneList } = useMemo(() => {
-    const selected = filteredGenes.filter(gene => selectedGenes.includes(gene))
-    const unselected = filteredGenes.filter(gene => !selectedGenes.includes(gene))
+  const { selectedGeneList, unselectedGeneList, showAllGenesOption } = useMemo(() => {
+    const isAllGenesSelected = selectedGenes.includes('All_Genes')
+
+    // When All_Genes is selected, only show All_Genes in selected list
+    const selected = isAllGenesSelected
+      ? ['All_Genes']
+      : filteredGenes.filter(gene => selectedGenes.includes(gene))
+
+    // When All_Genes is selected, show all genes as available (but they can't be selected)
+    const unselected = isAllGenesSelected
+      ? filteredGenes
+      : filteredGenes.filter(gene => !selectedGenes.includes(gene))
 
     // Limit unselected genes if not showing all
     const limitedUnselected = showAllGenes ? unselected : unselected.slice(0, 50)
 
+    // Show All_Genes option if it's not already selected
+    const showAllGenesOption = !selectedGenes.includes('All_Genes')
+
     return {
       selectedGeneList: selected,
-      unselectedGeneList: limitedUnselected
+      unselectedGeneList: limitedUnselected,
+      showAllGenesOption
     }
   }, [filteredGenes, selectedGenes, showAllGenes])
 
@@ -111,7 +124,7 @@ const GeneCheckboxList = ({
                 <input
                   type="checkbox"
                   checked={true}
-                  onChange={(e) => handleGeneToggle(gene, !e.target.checked)}
+                  onChange={(e) => handleGeneToggle(gene, false)}
                   disabled={disabled}
                 />
                 <span className={styles.checkboxLabel}>{gene}</span>
@@ -132,6 +145,18 @@ const GeneCheckboxList = ({
           )}
         </div>
         <div className={styles.geneList}>
+          {/* All_Genes option */}
+          {showAllGenesOption && (
+            <label key="All_Genes" className={styles.checkboxItem}>
+              <input
+                type="checkbox"
+                checked={false}
+                onChange={(e) => handleGeneToggle('All_Genes', e.target.checked)}
+                disabled={disabled}
+              />
+              <span className={styles.checkboxLabel}>All_Genes</span>
+            </label>
+          )}
           {unselectedGeneList.map(gene => (
             <label key={gene} className={styles.checkboxItem}>
               <input
