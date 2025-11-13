@@ -33,6 +33,7 @@ const PlotCanvas = ({
   const [selectedAnnotation, setSelectedAnnotation] = useState<LabelPoint | null>(null)
   const [draggingLabel, setDraggingLabel] = useState<LabelPoint | null>(null)
   const [draggedLabels, setDraggedLabels] = useState<LabelPoint[]>([])
+  const [originalLabelPositions, setOriginalLabelPositions] = useState<Record<string, {x: number, y: number}>>({})
   const [selectionMode, setSelectionMode] = useState<'freeform' | 'square'>('freeform')
   const [squareSelection, setSquareSelection] = useState<{
     start: [number, number]
@@ -551,7 +552,15 @@ const PlotCanvas = ({
     event.stopPropagation()
     setDraggingLabel(label)
 
-    // Initialize drag state
+    // Store original position if not already stored
+    if (!originalLabelPositions[label.label]) {
+      setOriginalLabelPositions(prev => ({
+        ...prev,
+        [label.label]: { x: label.x, y: label.y }
+      }))
+    }
+
+    // Initialize drag state - preserve existing dragged labels
     const updatedLabel = {
       ...label,
       isDragging: true,
@@ -561,10 +570,11 @@ const PlotCanvas = ({
       dragOffsetY: 0
     }
 
-    // Update the labels array with drag state
-    const updatedLabels = labels.map(l =>
-      l.label === label.label ? updatedLabel : l
-    )
+    // Update the labels array with drag state, preserving other dragged labels
+    const updatedLabels = draggedLabels.length > 0
+      ? draggedLabels.map(l => l.label === label.label ? updatedLabel : l)
+      : labels.map(l => l.label === label.label ? updatedLabel : l)
+
     setDraggedLabels(updatedLabels)
   }
 
@@ -596,7 +606,23 @@ const PlotCanvas = ({
   }
 
   const handleLabelMouseUp = (): void => {
+    if (draggingLabel) {
+      // Clear dragging state but keep the new position
+      const updatedLabels = draggedLabels.map(label =>
+        label.label === draggingLabel.label
+          ? { ...label, isDragging: false }
+          : label
+      )
+      setDraggedLabels(updatedLabels)
+    }
     setDraggingLabel(null)
+  }
+
+  // Reset all labels to their original positions
+  const resetLabelPositions = (): void => {
+    console.log('Resetting all label positions')
+    setDraggedLabels([])
+    setOriginalLabelPositions({})
   }
 
   // Use dragged labels if available, otherwise use original labels
@@ -779,6 +805,21 @@ const PlotCanvas = ({
             }}
           >
             {showAnnotationList ? 'Hide List' : 'Show List'}
+          </button>
+          <button
+            onClick={resetLabelPositions}
+            disabled={draggedLabels.length === 0}
+            style={{
+              padding: '4px 8px',
+              fontSize: '11px',
+              backgroundColor: draggedLabels.length > 0 ? '#FF5722' : '#f0f0f0',
+              color: draggedLabels.length > 0 ? 'white' : '#999',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              cursor: draggedLabels.length > 0 ? 'pointer' : 'not-allowed'
+            }}
+          >
+            Reset Labels
           </button>
         </div>
 

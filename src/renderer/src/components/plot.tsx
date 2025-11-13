@@ -58,6 +58,7 @@ const Plot = ({
   const [selectionLostMessage, setSelectionLostMessage] = useState<string>('')
   const [draggingLabel, setDraggingLabel] = useState<LabelPoint | null>(null)
   const [draggedLabels, setDraggedLabels] = useState<LabelPoint[]>([])
+  const [originalLabelPositions, setOriginalLabelPositions] = useState<Record<string, {x: number, y: number}>>({})
 
   const [togglePlotOptions, setTogglePlotOptions] = useState(false)
 
@@ -275,7 +276,15 @@ const Plot = ({
     event.stopPropagation()
     setDraggingLabel(label)
 
-    // Initialize drag state
+    // Store original position if not already stored
+    if (!originalLabelPositions[label.label]) {
+      setOriginalLabelPositions(prev => ({
+        ...prev,
+        [label.label]: { x: label.x, y: label.y }
+      }))
+    }
+
+    // Initialize drag state - preserve existing dragged labels
     const updatedLabel = {
       ...label,
       isDragging: true,
@@ -285,10 +294,11 @@ const Plot = ({
       dragOffsetY: 0
     }
 
-    // Update the labels array with drag state
-    const updatedLabels = labels.map(l =>
-      l.label === label.label ? updatedLabel : l
-    )
+    // Update the labels array with drag state, preserving other dragged labels
+    const updatedLabels = draggedLabels.length > 0
+      ? draggedLabels.map(l => l.label === label.label ? updatedLabel : l)
+      : labels.map(l => l.label === label.label ? updatedLabel : l)
+
     setDraggedLabels(updatedLabels)
   }
 
@@ -319,7 +329,23 @@ const Plot = ({
   }
 
   const handleLabelMouseUp = (): void => {
+    if (draggingLabel) {
+      // Clear dragging state but keep the new position
+      const updatedLabels = draggedLabels.map(label =>
+        label.label === draggingLabel.label
+          ? { ...label, isDragging: false }
+          : label
+      )
+      setDraggedLabels(updatedLabels)
+    }
     setDraggingLabel(null)
+  }
+
+  // Reset all labels to their original positions
+  const resetLabelPositions = (): void => {
+    console.log('Resetting all label positions')
+    setDraggedLabels([])
+    setOriginalLabelPositions({})
   }
 
   // Use dragged labels if available, otherwise use original labels
@@ -395,6 +421,30 @@ const Plot = ({
             <Settings />
           </div>
 
+          {/* Reset Labels Button */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '50px',
+              right: '10px',
+              zIndex: 10,
+              background: 'rgba(255, 255, 255, 0.9)',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid #ddd',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+              cursor: draggedLabels.length > 0 ? 'pointer' : 'not-allowed',
+              userSelect: 'none',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              color: draggedLabels.length > 0 ? '#FF5722' : '#999',
+              backgroundColor: draggedLabels.length > 0 ? 'rgba(255, 87, 34, 0.1)' : 'rgba(240, 240, 240, 0.9)'
+            }}
+            onClick={draggedLabels.length > 0 ? resetLabelPositions : undefined}
+          >
+            Reset Labels
+          </div>
+
         <svg
           ref={svgContainerRef}
           width={dimensions.width}
@@ -413,7 +463,7 @@ const Plot = ({
               handleMouseMove(event)
             }
           }}
-          onMouseUp={(event): void => {
+          onMouseUp={(): void => {
             // Handle annotation drag end
             handleLabelMouseUp()
             // Then handle lasso
