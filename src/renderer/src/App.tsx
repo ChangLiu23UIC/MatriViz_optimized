@@ -164,66 +164,113 @@ const App = (): JSX.Element => {
 
     const loadCentroidData = async (): Promise<void> => {
       try {
+        console.log('=== CENTROID DEBUG START ===')
         console.log('Loading centroid data for tissue:', currentResource.category_name)
         console.log('Centroid file path:', resourcesDir + currentResource.centroid_file)
 
         // First, let's check what columns are available in the centroid file
         try {
+          console.log('Attempting to get columns via native parquet...')
           const availableColumns = await window.parquet.getParquetColumns(
             resourcesDir + currentResource.centroid_file
           )
-          console.log('Available columns in centroid file (native):', availableColumns)
+          console.log('✅ Available columns in centroid file (native):', availableColumns)
+          console.log('✅ Required columns found:',
+            availableColumns.includes('cen_x') &&
+            availableColumns.includes('cen_y') &&
+            availableColumns.includes('Type'))
         } catch (columnError) {
-          console.error('Error getting centroid file columns (native):', columnError)
+          console.error('❌ Error getting centroid file columns (native):', columnError)
+          console.error('❌ Error message:', columnError.message)
+          console.error('❌ Error stack:', columnError.stack)
         }
 
         // Also try DuckDB to check columns
         try {
+          console.log('Attempting to get columns via DuckDB...')
           const duckdbColumns = await window.duckdb.getParquetColumns(
             resourcesDir + currentResource.centroid_file
           )
-          console.log('Available columns in centroid file (DuckDB):', duckdbColumns)
+          console.log('✅ Available columns in centroid file (DuckDB):', duckdbColumns)
+          console.log('✅ Required columns found:',
+            duckdbColumns.includes('cen_x') &&
+            duckdbColumns.includes('cen_y') &&
+            duckdbColumns.includes('Type'))
         } catch (duckdbColumnError) {
-          console.error('Error getting centroid file columns (DuckDB):', duckdbColumnError)
+          console.error('❌ Error getting centroid file columns (DuckDB):', duckdbColumnError)
+          console.error('❌ Error message:', duckdbColumnError.message)
+          console.error('❌ Error stack:', duckdbColumnError.stack)
         }
-
-        // File existence check - we'll rely on the error messages from the parquet libraries
 
         let centroidData
 
         // Try native parquet first
         try {
+          console.log('Attempting native parquet query...')
           centroidData = await window.parquet.queryParquetFile(
             resourcesDir + currentResource.centroid_file,
             ['cen_x', 'cen_y', 'Type']
           )
-          console.log('Native parquet query completed')
+          console.log('✅ Native parquet query completed')
 
           // Check if we got an error message instead of data
           if (typeof centroidData === 'string' && centroidData.includes('invalid parquet version')) {
-            console.log('Native parquet returned error message, triggering DuckDB fallback')
+            console.log('⚠️ Native parquet returned error message, triggering DuckDB fallback')
+            console.log('⚠️ Error content:', centroidData)
             throw new Error(`Native parquet version error: ${centroidData}`)
           }
 
-          console.log('Centroid data loaded via native parquet')
+          console.log('✅ Centroid data loaded via native parquet')
         } catch (nativeError) {
-          console.error('Native parquet query failed:', nativeError)
+          console.error('❌ Native parquet query failed:', nativeError)
+          console.error('❌ Native error message:', nativeError.message)
+          console.error('❌ Native error stack:', nativeError.stack)
+
           // Fallback to DuckDB
           try {
-            console.log('Falling back to DuckDB for centroid data')
-            console.log('DuckDB file path:', resourcesDir + currentResource.centroid_file)
+            console.log('🔄 Falling back to DuckDB for centroid data')
+            console.log('🔄 DuckDB file path:', resourcesDir + currentResource.centroid_file)
+
+            // Check if DuckDB is available
+            if (!window.duckdb || !window.duckdb.queryParquetFile) {
+              throw new Error('DuckDB API not available')
+            }
+            console.log('✅ DuckDB API is available')
+
+            console.log('🔄 Starting DuckDB query...')
+            const fullCentroidPath = resourcesDir + currentResource.centroid_file
+            console.log('🔄 Full centroid file path for DuckDB:', fullCentroidPath)
+            console.log('🔄 Expected columns:', ['cen_x', 'cen_y', 'Type'])
             const duckdbResult = await window.duckdb.queryParquetFile(
-              resourcesDir + currentResource.centroid_file,
+              fullCentroidPath,
               ['cen_x', 'cen_y', 'Type']
             )
-            console.log('DuckDB result structure:', duckdbResult)
-            console.log('DuckDB columns:', duckdbResult.columns)
-            console.log('DuckDB data length:', duckdbResult.data?.length)
-            centroidData = duckdbResult.data
-            console.log('Centroid data loaded via DuckDB fallback')
+            console.log('✅ DuckDB query completed successfully')
+            console.log('✅ DuckDB result structure:', duckdbResult)
+            console.log('✅ DuckDB columns:', duckdbResult.columns)
+            console.log('✅ DuckDB data length:', duckdbResult.data?.length)
+
+            // Convert DuckDB array format to object format
+            if (duckdbResult.data && duckdbResult.data.length > 0) {
+              console.log('🔄 Converting DuckDB array format to object format...')
+              centroidData = duckdbResult.data.map((row: any[]) => {
+                const obj: Record<string, unknown> = {}
+                duckdbResult.columns.forEach((col: string, index: number) => {
+                  obj[col] = row[index]
+                })
+                return obj
+              })
+              console.log('✅ DuckDB data converted to object format')
+              console.log('✅ First converted record:', centroidData[0])
+            } else {
+              centroidData = duckdbResult.data
+              console.log('⚠️ DuckDB returned empty data array')
+            }
+
+            console.log('✅ Centroid data loaded via DuckDB fallback')
           } catch (duckdbError) {
-            console.error('DuckDB fallback also failed:', duckdbError)
-            console.error('DuckDB error details:', {
+            console.error('❌ DuckDB fallback also failed:', duckdbError)
+            console.error('❌ DuckDB error details:', {
               message: duckdbError.message,
               stack: duckdbError.stack
             })
@@ -231,16 +278,27 @@ const App = (): JSX.Element => {
           }
         }
 
-        console.log('Raw centroid data received:', centroidData)
-        console.log('Type of centroidData:', typeof centroidData)
-        console.log('Is centroidData an array?', Array.isArray(centroidData))
+        console.log('📊 Raw centroid data received:', centroidData)
+        console.log('📊 Type of centroidData:', typeof centroidData)
+        console.log('📊 Is centroidData an array?', Array.isArray(centroidData))
         if (centroidData && typeof centroidData === 'object') {
-          console.log('centroidData keys:', Object.keys(centroidData))
+          console.log('📊 centroidData keys:', Object.keys(centroidData))
         }
 
         // Check if we actually got an array of data
         if (!Array.isArray(centroidData)) {
+          console.error('❌ Expected array but got:', typeof centroidData)
+          console.error('❌ Data content:', JSON.stringify(centroidData))
           throw new Error(`Expected array but got: ${typeof centroidData}. Data: ${JSON.stringify(centroidData)}`)
+        }
+
+        console.log('📊 Number of centroid records:', centroidData.length)
+
+        if (centroidData.length > 0) {
+          console.log('📊 First centroid record:', centroidData[0])
+          console.log('📊 First record cen_x type:', typeof centroidData[0].cen_x)
+          console.log('📊 First record cen_y type:', typeof centroidData[0].cen_y)
+          console.log('📊 First record Type type:', typeof centroidData[0].Type)
         }
 
         const processedCentroidData = centroidData.map((d) => ({
@@ -249,20 +307,23 @@ const App = (): JSX.Element => {
           label: d.Type as string,
           color: null
         }))
-        console.log('Loaded centroid data immediately:', processedCentroidData.length, 'labels')
+        console.log('✅ Loaded centroid data immediately:', processedCentroidData.length, 'labels')
         if (processedCentroidData.length > 0) {
-          console.log('First centroid:', processedCentroidData[0])
+          console.log('✅ First processed centroid:', processedCentroidData[0])
         }
         setLabels(processedCentroidData)
+        console.log('=== CENTROID DEBUG END ===')
       } catch (error) {
-        console.error('Error loading centroid data:', error)
-        console.error('Error details:', {
+        console.error('❌ FINAL ERROR loading centroid data:', error)
+        console.error('❌ Error details:', {
           directory: resourcesDir,
           centroidFile: currentResource.centroid_file,
           fullPath: resourcesDir + currentResource.centroid_file
         })
+        console.error('❌ Error stack:', error.stack)
         // Set empty labels as fallback - the application should still work without centroids
         setLabels([])
+        console.log('=== CENTROID DEBUG END WITH ERROR ===')
       }
     }
 
