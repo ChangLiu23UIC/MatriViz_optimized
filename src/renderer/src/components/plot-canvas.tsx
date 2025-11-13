@@ -31,6 +31,8 @@ const PlotCanvas = ({
   const [lassoPoints, setLassoPoints] = useState<[number, number][]>([])
   const [hoveredAnnotation, setHoveredAnnotation] = useState<LabelPoint | null>(null)
   const [selectedAnnotation, setSelectedAnnotation] = useState<LabelPoint | null>(null)
+  const [draggingLabel, setDraggingLabel] = useState<LabelPoint | null>(null)
+  const [draggedLabels, setDraggedLabels] = useState<LabelPoint[]>([])
   const [selectionMode, setSelectionMode] = useState<'freeform' | 'square'>('freeform')
   const [squareSelection, setSquareSelection] = useState<{
     start: [number, number]
@@ -104,9 +106,9 @@ const PlotCanvas = ({
   }, [data, plotState.autoMinScore, plotState.autoMaxScore])
 
   // Optimized scales
-  const { xScale, yScale, colorScale } = useMemo(() => {
+  const { xScale, yScale, colorScale, xScaleInvert, yScaleInvert } = useMemo(() => {
     if (!data || data.length === 0) {
-      return { xScale: null, yScale: null, colorScale: null }
+      return { xScale: null, yScale: null, colorScale: null, xScaleInvert: null, yScaleInvert: null }
     }
 
     // Calculate domains - include both data and labels
@@ -143,6 +145,10 @@ const PlotCanvas = ({
 
     const xScale = (x: number) => ((x - xDomain[0]) / (xDomain[1] - xDomain[0])) * dimensions.width
     const yScale = (y: number) => ((y - yDomain[0]) / (yDomain[1] - yDomain[0])) * dimensions.height
+
+    // Inverse scaling functions for converting canvas coordinates back to data coordinates
+    const xScaleInvert = (canvasX: number) => (canvasX / dimensions.width) * (xDomain[1] - xDomain[0]) + xDomain[0]
+    const yScaleInvert = (canvasY: number) => (canvasY / dimensions.height) * (yDomain[1] - yDomain[0]) + yDomain[0]
 
     // Test the scales
     console.log('Scale test - xScale(0):', xScale(0), 'yScale(0):', yScale(0))
@@ -190,7 +196,7 @@ const PlotCanvas = ({
       return resultColor
     }
 
-    return { xScale, yScale, colorScale }
+    return { xScale, yScale, colorScale, xScaleInvert, yScaleInvert }
   }, [data, dimensions, plotState.minScore, plotState.maxScore, plotState.minColor, plotState.maxColor])
 
   // Draw points on canvas
@@ -263,10 +269,12 @@ const PlotCanvas = ({
     ctx.restore()
 
     // Draw annotation labels
-    if (showCentroidText && labels && labels.length > 0 && xScale && yScale) {
-      console.log('Drawing annotations on canvas:', labels.length, 'labels')
-      if (labels.length > 0) {
-        console.log('First label:', labels[0])
+    if (showCentroidText && displayLabels && displayLabels.length > 0 && xScale && yScale) {
+      console.log('Drawing annotations on canvas:', displayLabels.length, 'labels')
+      if (displayLabels.length > 0) {
+        console.log('First label:', displayLabels[0])
+        console.log('First label coordinates (data):', displayLabels[0].x, displayLabels[0].y)
+        console.log('First label coordinates (canvas):', xScale(displayLabels[0].x), yScale(displayLabels[0].y))
       }
 
       ctx.save()
@@ -274,23 +282,39 @@ const PlotCanvas = ({
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
 
-      for (const label of labels) {
+      for (const label of displayLabels) {
         const x = xScale(label.x)
         const y = yScale(label.y)
         console.log(`Drawing label "${label.label}" at (${label.x}, ${label.y}) -> canvas (${x}, ${y})`)
 
         const isHovered = hoveredAnnotation?.label === label.label
         const isSelected = selectedAnnotation?.label === label.label
+        const isDragging = label.isDragging
+
+        // Draw centroid line if dragging
+        if (isDragging && label.originalX !== undefined && label.originalY !== undefined) {
+          ctx.save()
+          ctx.strokeStyle = '#ff4444'
+          ctx.lineWidth = 1
+          ctx.setLineDash([4, 4])
+          ctx.beginPath()
+          ctx.moveTo(x, y)
+          ctx.lineTo(xScale(label.originalX), yScale(label.originalY))
+          ctx.stroke()
+          ctx.restore()
+        }
 
         // Draw white stroke/outline with transparency
-        ctx.strokeStyle = isHovered || isSelected
+        ctx.strokeStyle = isHovered || isSelected || isDragging
           ? 'rgba(255, 255, 255, 0.9)' // More opaque when highlighted
           : 'rgba(255, 255, 255, 0.5)' // 0.5 alpha as default
-        ctx.lineWidth = isHovered || isSelected ? 4 : 3
+        ctx.lineWidth = isHovered || isSelected || isDragging ? 4 : 3
         ctx.strokeText(label.label, x, y)
 
         // Draw text with different colors based on state
-        if (isHovered || isSelected) {
+        if (isDragging) {
+          ctx.fillStyle = 'rgba(255, 68, 68, 0.9)' // Red for dragging
+        } else if (isHovered || isSelected) {
           ctx.fillStyle = isSelected ? 'rgba(255, 0, 0, 0.9)' : 'rgba(0, 100, 255, 0.9)'
         } else {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.5)' // 0.5 alpha as default
@@ -335,7 +359,40 @@ const PlotCanvas = ({
       console.log('Canvas square selection drawn')
     }
 
-  }, [data, xScale, yScale, colorScale, plotState.pointSize, selectedPoints, isDrawing, lassoPoints, squareSelection, selectionMode, dimensions, labels, hoveredAnnotation, selectedAnnotation, showCentroidText])
+  }, [data, xScale, yScale, colorScale, plotState.pointSize, selectedPoints, isDrawing, lassoPoints, squareSelection, selectionMode, dimensions, labels, draggedLabels, hoveredAnnotation, selectedAnnotation, showCentroidText])
+
+  // Helper function to find label at a point
+  const findLabelAtPoint = (point: [number, number]): LabelPoint | null => {
+    if (!xScale || !yScale) {
+      console.log('findLabelAtPoint - scales not available')
+      return null
+    }
+
+    const [mouseX, mouseY] = point
+    let closestLabel: LabelPoint | null = null
+    let minDistance = Infinity
+
+    console.log('findLabelAtPoint - checking point:', point, 'displayLabels count:', displayLabels.length)
+    console.log('findLabelAtPoint - scales available:', !!xScale, !!yScale)
+
+    for (const label of displayLabels) {
+      const labelX = xScale(label.x)
+      const labelY = yScale(label.y)
+      const distance = Math.sqrt((mouseX - labelX) ** 2 + (mouseY - labelY) ** 2)
+
+      console.log(`findLabelAtPoint - checking label "${label.label}" at canvas (${labelX}, ${labelY}) - distance: ${distance}`)
+
+      // Consider label as clicked if within 20 pixels
+      if (distance < 20 && distance < minDistance) {
+        minDistance = distance
+        closestLabel = label
+        console.log('findLabelAtPoint - found label:', label.label, 'at distance:', distance)
+      }
+    }
+
+    console.log('findLabelAtPoint - result:', closestLabel?.label)
+    return closestLabel
+  }
 
   // Mouse event handlers
   const handleMouseDown = (event: React.MouseEvent) => {
@@ -351,6 +408,17 @@ const PlotCanvas = ({
     console.log('Canvas Mouse down - starting selection at:', point, 'mode:', selectionMode)
     console.log('Canvas bounds:', rect)
 
+    // Check if clicking on an annotation first
+    const clickedLabel = findLabelAtPoint(point)
+    console.log('Annotation detection - clickedLabel:', clickedLabel, 'displayLabels count:', displayLabels.length)
+    if (clickedLabel) {
+      console.log('Starting annotation drag for:', clickedLabel.label)
+      handleLabelMouseDown(clickedLabel, event)
+      return
+    }
+
+    // Otherwise start lasso selection
+    console.log('No annotation clicked, starting lasso selection')
     if (selectionMode === 'freeform') {
       setIsDrawing(true)
       setLassoPoints([point])
@@ -364,7 +432,10 @@ const PlotCanvas = ({
   }
 
   const handleMouseMove = (event: React.MouseEvent) => {
-    if (isDrawing) {
+    // Handle annotation drag first
+    handleLabelMouseMove(event)
+
+    if (isDrawing && !draggingLabel) {
       const canvas = canvasRef.current
       if (!canvas) return
 
@@ -389,12 +460,15 @@ const PlotCanvas = ({
         // Update square selection end point
         setSquareSelection(prev => prev ? { ...prev, end: point } : null)
       }
-    } else {
+    } else if (!draggingLabel) {
       handleMouseMoveForHover(event)
     }
   }
 
   const handleMouseUp = () => {
+    // Handle annotation drag end
+    handleLabelMouseUp()
+
     console.log('Canvas Mouse up - isDrawing:', isDrawing, 'selectionMode:', selectionMode)
     if (!isDrawing) {
       setIsDrawing(false)
@@ -471,6 +545,62 @@ const PlotCanvas = ({
       setSquareSelection(null)
     }
   }
+
+  // Drag handlers for annotations
+  const handleLabelMouseDown = (label: LabelPoint, event: React.MouseEvent): void => {
+    event.stopPropagation()
+    setDraggingLabel(label)
+
+    // Initialize drag state
+    const updatedLabel = {
+      ...label,
+      isDragging: true,
+      originalX: label.originalX ?? label.x,
+      originalY: label.originalY ?? label.y,
+      dragOffsetX: 0,
+      dragOffsetY: 0
+    }
+
+    // Update the labels array with drag state
+    const updatedLabels = labels.map(l =>
+      l.label === label.label ? updatedLabel : l
+    )
+    setDraggedLabels(updatedLabels)
+  }
+
+  const handleLabelMouseMove = (event: React.MouseEvent): void => {
+    if (!draggingLabel || !canvasRef.current || !xScale || !yScale || !xScaleInvert || !yScaleInvert) return
+
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const mouseX = event.clientX - rect.left
+    const mouseY = event.clientY - rect.top
+
+    // Convert mouse coordinates to data coordinates
+    const dataX = xScaleInvert(mouseX)
+    const dataY = yScaleInvert(mouseY)
+
+    // Update the dragged label position
+    const updatedLabels = draggedLabels.map(label => {
+      if (label.label === draggingLabel.label) {
+        return {
+          ...label,
+          x: dataX,
+          y: dataY
+        }
+      }
+      return label
+    })
+
+    setDraggedLabels(updatedLabels)
+  }
+
+  const handleLabelMouseUp = (): void => {
+    setDraggingLabel(null)
+  }
+
+  // Use dragged labels if available, otherwise use original labels
+  const displayLabels = draggedLabels.length > 0 ? draggedLabels : labels
 
   // Handle mouse move for annotation hover detection
   const handleMouseMoveForHover = (event: React.MouseEvent) => {

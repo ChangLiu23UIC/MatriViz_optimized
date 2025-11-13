@@ -65,6 +65,16 @@
   filter: drop-shadow(0 0 8px rgba(40, 167, 69, 0.5)) !important;
 }
 
+/* Dragging annotation styles */
+.dragging {
+  fill: #ff4444 !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9) !important;
+  filter: drop-shadow(0 0 6px rgba(255, 68, 68, 0.6)) !important;
+  cursor: grabbing !important;
+}
+
 .labelHovered {
   fill: #0066cc !important;
   font-weight: 700 !important;

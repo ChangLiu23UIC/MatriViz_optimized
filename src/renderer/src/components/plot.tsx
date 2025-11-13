@@ -56,6 +56,8 @@ const Plot = ({
   const [zoomLevel, setZoomLevel] = useState(1)
   const [tooltip, setTooltip] = useState<TooltipData>()
   const [selectionLostMessage, setSelectionLostMessage] = useState<string>('')
+  const [draggingLabel, setDraggingLabel] = useState<LabelPoint | null>(null)
+  const [draggedLabels, setDraggedLabels] = useState<LabelPoint[]>([])
 
   const [togglePlotOptions, setTogglePlotOptions] = useState(false)
 
@@ -267,6 +269,62 @@ const Plot = ({
     setTooltip({ top: 0, left: 0, data: null })
   }
 
+  // Drag handlers for annotations
+  const handleLabelMouseDown = (event: React.MouseEvent<SVGTextElement>, label: LabelPoint): void => {
+    console.log('SVG annotation drag started for:', label.label)
+    event.stopPropagation()
+    setDraggingLabel(label)
+
+    // Initialize drag state
+    const updatedLabel = {
+      ...label,
+      isDragging: true,
+      originalX: label.originalX ?? label.x,
+      originalY: label.originalY ?? label.y,
+      dragOffsetX: 0,
+      dragOffsetY: 0
+    }
+
+    // Update the labels array with drag state
+    const updatedLabels = labels.map(l =>
+      l.label === label.label ? updatedLabel : l
+    )
+    setDraggedLabels(updatedLabels)
+  }
+
+  const handleLabelMouseMove = (event: React.MouseEvent<SVGElement>): void => {
+    if (!draggingLabel || !svgContainerRef.current) return
+
+    const svgRect = svgContainerRef.current.getBoundingClientRect()
+    const mouseX = event.clientX - svgRect.left
+    const mouseY = event.clientY - svgRect.top
+
+    // Convert mouse coordinates to data coordinates
+    const dataX = xScale.invert(mouseX)
+    const dataY = yScale.invert(mouseY)
+
+    // Update the dragged label position
+    const updatedLabels = draggedLabels.map(label => {
+      if (label.label === draggingLabel.label) {
+        return {
+          ...label,
+          x: dataX,
+          y: dataY
+        }
+      }
+      return label
+    })
+
+    setDraggedLabels(updatedLabels)
+  }
+
+  const handleLabelMouseUp = (): void => {
+    setDraggingLabel(null)
+  }
+
+  // Use dragged labels if available, otherwise use original labels
+  const displayLabels = draggedLabels.length > 0 ? draggedLabels : labels
+
   const selectedPointIds = useMemo(() => {
     return new Set(selectedPoints.map((point) => point.index))
   }, [selectedPoints])
@@ -341,9 +399,26 @@ const Plot = ({
           ref={svgContainerRef}
           width={dimensions.width}
           height={dimensions.height}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
+          onMouseDown={(event): void => {
+            // Only handle lasso if not dragging an annotation
+            if (!draggingLabel) {
+              handleMouseDown(event)
+            }
+          }}
+          onMouseMove={(event): void => {
+            // Handle annotation drag first
+            handleLabelMouseMove(event)
+            // Then handle lasso if not dragging
+            if (!draggingLabel) {
+              handleMouseMove(event)
+            }
+          }}
+          onMouseUp={(event): void => {
+            // Handle annotation drag end
+            handleLabelMouseUp()
+            // Then handle lasso
+            handleMouseUp()
+          }}
         >
           <LinearGradient id="stroke" from="#6699ff" to="#9933cc" />
           <Group>
@@ -366,22 +441,37 @@ const Plot = ({
               />
             ))}
             {plotState.toggleLabels &&
-              labels?.map((label, index) => (
-                <text
-                  key={`label-${label.label || index}`}
-                  x={xScale(label.x)}
-                  y={yScale(label.y)}
-                  className={styles.label}
-                  textAnchor="middle"
-                  fontSize="10"
-                  fontWeight="bold"
-                  fill="#000000"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  paintOrder="stroke"
-                >
-                  {label.label}
-                </text>
+              displayLabels?.map((label, index) => (
+                <g key={`label-${label.label || index}`}>
+                  {/* Centroid line from current position to original position */}
+                  {label.isDragging && label.originalX !== undefined && label.originalY !== undefined && (
+                    <line
+                      x1={xScale(label.x)}
+                      y1={yScale(label.y)}
+                      x2={xScale(label.originalX)}
+                      y2={yScale(label.originalY)}
+                      stroke="#ff4444"
+                      strokeWidth="1"
+                      strokeDasharray="4,4"
+                    />
+                  )}
+                  <text
+                    x={xScale(label.x)}
+                    y={yScale(label.y)}
+                    className={`${styles.label} ${label.isDragging ? styles.dragging : ''}`}
+                    textAnchor="middle"
+                    fontSize="10"
+                    fontWeight="bold"
+                    fill={label.isDragging ? "#ff4444" : "#000000"}
+                    stroke={label.isDragging ? "#ffffff" : "#ffffff"}
+                    strokeWidth="2"
+                    paintOrder="stroke"
+                    onMouseDown={(event): void => handleLabelMouseDown(event, label)}
+                    style={{ cursor: 'move' }}
+                  >
+                    {label.label}
+                  </text>
+                </g>
               ))}
             <Lasso />
           </Group>

@@ -16,6 +16,11 @@ export interface LabelPoint {
   y: number
   label: string
   color: string | null
+  isDragging?: boolean
+  dragOffsetX?: number
+  dragOffsetY?: number
+  originalX?: number
+  originalY?: number
 }
 
 export interface TooltipData {
