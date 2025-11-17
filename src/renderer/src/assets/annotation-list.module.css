@@ -48,28 +48,10 @@
   background-color: #90caf9;
 }
 
-.visibilityToggle {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px 4px;
+.visibilityCheckbox {
   margin-right: 8px;
-  border-radius: 3px;
-  transition: all 0.2s ease;
-}
-
-.visibilityToggle:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-  transform: scale(1.1);
-}
-
-.visibilityToggle.visible {
-  opacity: 1;
-}
-
-.visibilityToggle.hidden {
-  opacity: 0.5;
+  cursor: pointer;
+  transform: scale(1.2);
 }
 
 .labelText {
@@ -79,4 +61,32 @@
 .annotationItem {
   display: flex;
   align-items: center;
+}
+
+.searchContainer {
+  padding: 8px 12px;
+  border-bottom: 1px solid #eee;
+  background: #f8f9fa;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: #2196f3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.noResults {
+  padding: 16px 12px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  font-size: 13px;
 }

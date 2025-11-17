@@ -1,5 +1,6 @@
 import { LabelPoint } from '../types'
 import styles from '../assets/annotation-list.module.css'
+import { useState, useMemo } from 'react'
 
 interface AnnotationListProps {
   labels: LabelPoint[]
@@ -20,6 +21,8 @@ const AnnotationList = ({
   visibleLabels,
   onToggleVisibility
 }: AnnotationListProps): JSX.Element => {
+  const [searchTerm, setSearchTerm] = useState('')
+
   const handleMouseEnter = (label: LabelPoint) => {
     onAnnotationHover(label)
   }
@@ -32,14 +35,37 @@ const AnnotationList = ({
     onAnnotationSelect(label)
   }
 
-  // Remove duplicates and sort alphabetically
-  const uniqueLabels = Array.from(
-    new Map(labels.map(label => [label.label, label])).values()
-  ).sort((a, b) => a.label.localeCompare(b.label))
+  // Remove duplicates and sort alphabetically, then filter by search term
+  const filteredLabels = useMemo(() => {
+    const uniqueLabels = Array.from(
+      new Map(labels.map(label => [label.label, label])).values()
+    ).sort((a, b) => a.label.localeCompare(b.label))
+
+    if (!searchTerm.trim()) {
+      return uniqueLabels
+    }
+
+    const searchLower = searchTerm.toLowerCase()
+    return uniqueLabels.filter(label =>
+      label.label.toLowerCase().includes(searchLower)
+    )
+  }, [labels, searchTerm])
 
   return (
     <div className={styles.annotationList}>
-      {uniqueLabels.map((label) => {
+      {/* Search Bar */}
+      <div className={styles.searchContainer}>
+        <input
+          type="text"
+          placeholder="Search labels..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className={styles.searchInput}
+        />
+      </div>
+
+      {/* Filtered Labels List */}
+      {filteredLabels.map((label) => {
         const isVisible = visibleLabels.size === 0 || visibleLabels.has(label.label)
         return (
           <div
@@ -54,20 +80,27 @@ const AnnotationList = ({
             onMouseLeave={handleMouseLeave}
             onClick={() => handleClick(label)}
           >
-            <button
-              className={`${styles.visibilityToggle} ${isVisible ? styles.visible : styles.hidden}`}
-              onClick={(e) => {
+            <input
+              type="checkbox"
+              className={styles.visibilityCheckbox}
+              checked={isVisible}
+              onChange={(e) => {
                 e.stopPropagation() // Prevent triggering the parent click
                 onToggleVisibility(label.label)
               }}
               title={isVisible ? 'Hide label' : 'Show label'}
-            >
-              {isVisible ? '👁️' : '🙈'}
-            </button>
+            />
             <span className={styles.labelText}>{label.label}</span>
           </div>
         )
       })}
+
+      {/* No results message */}
+      {filteredLabels.length === 0 && (
+        <div className={styles.noResults}>
+          No labels found matching "{searchTerm}"
+        </div>
+      )}
     </div>
   )
 }

@@ -803,7 +803,7 @@ const PlotCanvas = ({
         {/* Annotation List Toggle */}
         <div style={{
           position: 'absolute',
-          top: 120, // Moved lower to avoid blocking legend
+          top: 10, // Moved to very top to prevent covering points
           right: 10,
           zIndex: 10,
           display: 'flex',

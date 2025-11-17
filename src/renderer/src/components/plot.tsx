@@ -444,7 +444,7 @@ const Plot = ({
           <div
             style={{
               position: 'absolute',
-              top: '50px',
+              top: '10px',
               right: '10px',
               zIndex: 10,
               display: 'flex',
