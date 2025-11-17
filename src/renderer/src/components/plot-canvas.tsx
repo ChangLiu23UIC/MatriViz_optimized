@@ -41,6 +41,7 @@ const PlotCanvas = ({
   } | null>(null)
   const [showAnnotationList, setShowAnnotationList] = useState(true)
   const [showCentroidText, setShowCentroidText] = useState(true)
+  const [visibleLabels, setVisibleLabels] = useState<Set<string>>(new Set()) // Track which labels are visible
 
   // Auto-scaling for expression data
   useEffect(() => {
@@ -625,8 +626,38 @@ const PlotCanvas = ({
     setOriginalLabelPositions({})
   }
 
-  // Use dragged labels if available, otherwise use original labels
-  const displayLabels = draggedLabels.length > 0 ? draggedLabels : labels
+  // Toggle label visibility
+  const toggleLabelVisibility = (labelName: string): void => {
+    setVisibleLabels(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(labelName)) {
+        newSet.delete(labelName)
+      } else {
+        newSet.add(labelName)
+      }
+      return newSet
+    })
+  }
+
+  // Show all labels
+  const showAllLabels = (): void => {
+    const allLabelNames = new Set(labels.map(label => label.label))
+    setVisibleLabels(allLabelNames)
+  }
+
+  // Hide all labels
+  const hideAllLabels = (): void => {
+    setVisibleLabels(new Set())
+  }
+
+  // Use dragged labels if available, otherwise use original labels, filtered by visibility
+  const baseLabels = draggedLabels.length > 0 ? draggedLabels : labels
+  const displayLabels = baseLabels.filter(label => {
+    // If no labels are explicitly set as visible, show all labels
+    if (visibleLabels.size === 0) return true
+    // Otherwise, only show labels that are in the visible set
+    return visibleLabels.has(label.label)
+  })
 
   // Handle mouse move for annotation hover detection
   const handleMouseMoveForHover = (event: React.MouseEvent) => {
@@ -807,6 +838,34 @@ const PlotCanvas = ({
             {showAnnotationList ? 'Hide List' : 'Show List'}
           </button>
           <button
+            onClick={showAllLabels}
+            style={{
+              padding: '4px 8px',
+              fontSize: '11px',
+              backgroundColor: '#28a745',
+              color: 'white',
+              border: '1px solid #1e7e34',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Show All
+          </button>
+          <button
+            onClick={hideAllLabels}
+            style={{
+              padding: '4px 8px',
+              fontSize: '11px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: '1px solid #c82333',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Hide All
+          </button>
+          <button
             onClick={resetLabelPositions}
             disabled={draggedLabels.length === 0}
             style={{
@@ -857,6 +916,8 @@ const PlotCanvas = ({
               hoveredAnnotation={hoveredAnnotation}
               selectedAnnotation={selectedAnnotation}
               onAnnotationSelect={setSelectedAnnotation}
+              visibleLabels={visibleLabels}
+              onToggleVisibility={toggleLabelVisibility}
             />
           </div>
         </div>

@@ -7,6 +7,8 @@ interface AnnotationListProps {
   hoveredAnnotation: LabelPoint | null
   selectedAnnotation: LabelPoint | null
   onAnnotationSelect: (label: LabelPoint | null) => void
+  visibleLabels: Set<string>
+  onToggleVisibility: (labelName: string) => void
 }
 
 const AnnotationList = ({
@@ -14,7 +16,9 @@ const AnnotationList = ({
   onAnnotationHover,
   hoveredAnnotation,
   selectedAnnotation,
-  onAnnotationSelect
+  onAnnotationSelect,
+  visibleLabels,
+  onToggleVisibility
 }: AnnotationListProps): JSX.Element => {
   const handleMouseEnter = (label: LabelPoint) => {
     onAnnotationHover(label)
@@ -35,22 +39,35 @@ const AnnotationList = ({
 
   return (
     <div className={styles.annotationList}>
-      {uniqueLabels.map((label) => (
-        <div
-          key={label.label}
-          className={`${styles.annotationItem} ${
-            hoveredAnnotation?.label === label.label ||
-            selectedAnnotation?.label === label.label
-              ? styles.highlighted
-              : ''
-          }`}
-          onMouseEnter={() => handleMouseEnter(label)}
-          onMouseLeave={handleMouseLeave}
-          onClick={() => handleClick(label)}
-        >
-          {label.label}
-        </div>
-      ))}
+      {uniqueLabels.map((label) => {
+        const isVisible = visibleLabels.size === 0 || visibleLabels.has(label.label)
+        return (
+          <div
+            key={label.label}
+            className={`${styles.annotationItem} ${
+              hoveredAnnotation?.label === label.label ||
+              selectedAnnotation?.label === label.label
+                ? styles.highlighted
+                : ''
+            }`}
+            onMouseEnter={() => handleMouseEnter(label)}
+            onMouseLeave={handleMouseLeave}
+            onClick={() => handleClick(label)}
+          >
+            <button
+              className={`${styles.visibilityToggle} ${isVisible ? styles.visible : styles.hidden}`}
+              onClick={(e) => {
+                e.stopPropagation() // Prevent triggering the parent click
+                onToggleVisibility(label.label)
+              }}
+              title={isVisible ? 'Hide label' : 'Show label'}
+            >
+              {isVisible ? '👁️' : '🙈'}
+            </button>
+            <span className={styles.labelText}>{label.label}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }

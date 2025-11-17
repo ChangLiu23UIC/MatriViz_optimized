@@ -61,6 +61,7 @@ const Plot = ({
   const [originalLabelPositions, setOriginalLabelPositions] = useState<Record<string, {x: number, y: number}>>({})
 
   const [togglePlotOptions, setTogglePlotOptions] = useState(false)
+  const [visibleLabels, setVisibleLabels] = useState<Set<string>>(new Set()) // Track which labels are visible
 
   const scaleOffset = 2
 
@@ -348,8 +349,26 @@ const Plot = ({
     setOriginalLabelPositions({})
   }
 
-  // Use dragged labels if available, otherwise use original labels
-  const displayLabels = draggedLabels.length > 0 ? draggedLabels : labels
+
+  // Show all labels
+  const showAllLabels = (): void => {
+    const allLabelNames = new Set(labels.map(label => label.label))
+    setVisibleLabels(allLabelNames)
+  }
+
+  // Hide all labels
+  const hideAllLabels = (): void => {
+    setVisibleLabels(new Set())
+  }
+
+  // Use dragged labels if available, otherwise use original labels, filtered by visibility
+  const baseLabels = draggedLabels.length > 0 ? draggedLabels : labels
+  const displayLabels = baseLabels.filter(label => {
+    // If no labels are explicitly set as visible, show all labels
+    if (visibleLabels.size === 0) return true
+    // Otherwise, only show labels that are in the visible set
+    return visibleLabels.has(label.label)
+  })
 
   const selectedPointIds = useMemo(() => {
     return new Set(selectedPoints.map((point) => point.index))
@@ -421,28 +440,72 @@ const Plot = ({
             <Settings />
           </div>
 
-          {/* Reset Labels Button */}
+          {/* Label Visibility Controls */}
           <div
             style={{
               position: 'absolute',
               top: '50px',
               right: '10px',
               zIndex: 10,
-              background: 'rgba(255, 255, 255, 0.9)',
-              padding: '6px 10px',
-              borderRadius: '6px',
-              border: '1px solid #ddd',
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
-              cursor: draggedLabels.length > 0 ? 'pointer' : 'not-allowed',
-              userSelect: 'none',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              color: draggedLabels.length > 0 ? '#FF5722' : '#999',
-              backgroundColor: draggedLabels.length > 0 ? 'rgba(255, 87, 34, 0.1)' : 'rgba(240, 240, 240, 0.9)'
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px'
             }}
-            onClick={draggedLabels.length > 0 ? resetLabelPositions : undefined}
           >
-            Reset Labels
+            <div
+              style={{
+                display: 'flex',
+                gap: '6px'
+              }}
+            >
+              <button
+                onClick={showAllLabels}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  backgroundColor: '#28a745',
+                  color: 'white',
+                  border: '1px solid #1e7e34',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Show All
+              </button>
+              <button
+                onClick={hideAllLabels}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '11px',
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: '1px solid #c82333',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Hide All
+              </button>
+            </div>
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.9)',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)',
+                cursor: draggedLabels.length > 0 ? 'pointer' : 'not-allowed',
+                userSelect: 'none',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                color: draggedLabels.length > 0 ? '#FF5722' : '#999',
+                backgroundColor: draggedLabels.length > 0 ? 'rgba(255, 87, 34, 0.1)' : 'rgba(240, 240, 240, 0.9)',
+                textAlign: 'center'
+              }}
+              onClick={draggedLabels.length > 0 ? resetLabelPositions : undefined}
+            >
+              Reset Labels
+            </div>
           </div>
 
         <svg
