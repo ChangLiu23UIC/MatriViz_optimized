@@ -435,6 +435,12 @@ const Plot = ({
           <div
             className={styles.settings}
             onClick={(): void => setTogglePlotOptions(!togglePlotOptions)}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              zIndex: 20
+            }}
           >
             <p>Plot options </p>
             <Settings />
@@ -452,41 +458,20 @@ const Plot = ({
               gap: '6px'
             }}
           >
-            <div
+            <button
+              onClick={showAllLabels}
               style={{
-                display: 'flex',
-                gap: '6px'
+                padding: '4px 8px',
+                fontSize: '11px',
+                backgroundColor: '#2196F3',
+                color: 'white',
+                border: '1px solid #1976D2',
+                borderRadius: '4px',
+                cursor: 'pointer'
               }}
             >
-              <button
-                onClick={showAllLabels}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  backgroundColor: '#28a745',
-                  color: 'white',
-                  border: '1px solid #1e7e34',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Show All
-              </button>
-              <button
-                onClick={hideAllLabels}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '11px',
-                  backgroundColor: '#dc3545',
-                  color: 'white',
-                  border: '1px solid #c82333',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Hide All
-              </button>
-            </div>
+              Select All
+            </button>
             <div
               style={{
                 background: 'rgba(255, 255, 255, 0.9)',

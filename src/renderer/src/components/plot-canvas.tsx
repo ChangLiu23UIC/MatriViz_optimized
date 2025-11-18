@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useMemo, useState } from 'react'
 import { DataPoint, LabelPoint, PlotState } from '../types'
 import Legend from './legend'
 import AnnotationList from './annotation-list'
+import PlotOptions from './plotOptions'
+import { Settings } from 'lucide-react'
+import styles from '../assets/plot.module.css'
 
 interface PlotCanvasProps {
   data: DataPoint[]
@@ -42,6 +45,7 @@ const PlotCanvas = ({
   const [showAnnotationList, setShowAnnotationList] = useState(true)
   const [showCentroidText, setShowCentroidText] = useState(true)
   const [visibleLabels, setVisibleLabels] = useState<Set<string>>(new Set()) // Track which labels are visible
+  const [togglePlotOptions, setTogglePlotOptions] = useState(false)
 
   // Auto-scaling for expression data
   useEffect(() => {
@@ -715,13 +719,30 @@ const PlotCanvas = ({
   }, [])
 
   return (
-    <div style={{
-      position: 'relative',
-      width: '100%',
-      height: '100%',
-      display: 'flex'
-    }}>
-      {/* Main canvas area */}
+    <>
+      {togglePlotOptions && <PlotOptions plotState={plotState} setPlotState={setPlotState} />}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        display: 'flex'
+      }}>
+        {/* Plot Options Button */}
+        <div
+          className={styles.settings}
+          onClick={(): void => setTogglePlotOptions(!togglePlotOptions)}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            left: '10px',
+            zIndex: 20
+          }}
+        >
+          <p>Plot options </p>
+          <Settings />
+        </div>
+
+        {/* Main canvas area */}
       <div style={{
         flex: 1,
         position: 'relative'
@@ -842,28 +863,14 @@ const PlotCanvas = ({
             style={{
               padding: '4px 8px',
               fontSize: '11px',
-              backgroundColor: '#28a745',
+              backgroundColor: '#2196F3',
               color: 'white',
-              border: '1px solid #1e7e34',
+              border: '1px solid #1976D2',
               borderRadius: '4px',
               cursor: 'pointer'
             }}
           >
-            Show All
-          </button>
-          <button
-            onClick={hideAllLabels}
-            style={{
-              padding: '4px 8px',
-              fontSize: '11px',
-              backgroundColor: '#dc3545',
-              color: 'white',
-              border: '1px solid #c82333',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-          >
-            Hide All
+            Select All
           </button>
           <button
             onClick={resetLabelPositions}
@@ -922,7 +929,8 @@ const PlotCanvas = ({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
 
